@@ -8,9 +8,9 @@ Build the FastAPI/uv project, Compose services, settings, Alembic scaffold, logg
 
 Implemented the user and refresh-token models/migration; register, login, refresh, logout, and `/users/me`; plus Google/GitHub OAuth entry and callback endpoints. API tests cover happy paths, invalid credentials, duplicate registration, revoked/rotated refresh tokens, unauthenticated access, validation, and unconfigured OAuth providers.
 
-## Phase 3 — Projects, files, and sessions
+## Phase 3 — Projects, files, and sessions (complete)
 
-Implement user-owned project/file CRUD and session/event ingestion with validation and per-session rate limits. Swagger can create a project, mutate files, open a session, and submit an event batch.
+Implemented user-owned project/file CRUD and session/event ingestion with input-size validation, ownership enforcement, and an in-memory per-session event-batch limit. Swagger can create a project, mutate files, open/end a session, and submit editor event batches.
 
 ## Phase 4 — Code execution
 

@@ -27,6 +27,11 @@ class ConflictError(AppError):
     detail = "The resource conflicts with existing data."
 
 
+class RateLimitError(AppError):
+    status_code = 429
+    detail = "Rate limit exceeded."
+
+
 class AIProviderError(AppError):
     status_code = 503
     detail = "The AI provider is currently unavailable."

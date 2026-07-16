@@ -23,6 +23,37 @@
 ### TODO / Next Recommended Step
 - Confirm Phase 1, then implement Phase 2 authentication and users with its first Alembic migration.
 
+## 2026-07-17 02:15
+
+### Completed
+- Provisioned the Python 3.12 runtime in the local Piston sandbox and verified it directly.
+- Made `session_id` optional for `POST /execution/run`, so the authenticated execution API accepts the requested standalone payload.
+- Added the Phase 4 migration to permit execution records without a learning session.
+- Applied the migration to PostgreSQL and validated the complete live flow: registration, login, and Python execution.
+
+### Files Added
+- `alembic/versions/20260717_0004_allow_standalone_execution_runs.py`
+
+### Files Modified
+- `app/api/routers/execution.py`
+- `app/models/execution.py`
+- `app/schemas/execution.py`
+- `app/services/execution_service.py`
+- `log.md`
+
+### Verification
+- `uv run ruff format --check .`
+- `uv run ruff check .`
+- `uv run pytest -q` (10 passed)
+- `uv run alembic upgrade head`
+- Live `POST /execution/run` with authenticated standalone Python payload returned `stdout: hello world\\n`, empty `stderr`, exit code `0`, and an execution time.
+
+### Known Limitations
+- Piston is intended for local development here; production code execution requires hardened, isolated infrastructure and resource controls.
+
+### TODO / Next Recommended Step
+- Continue to Phase 5: Redis-backed rate limits, abuse controls, and production-safe execution constraints.
+
 ## 2026-07-17 00:40
 
 ### Completed
@@ -168,6 +199,83 @@
 
 ### TODO / Next Recommended Step
 - Open `/demo/` and use its register, login, and profile actions to inspect Phase 2 visually.
+
+## 2026-07-17 01:25
+
+### Completed
+- Implemented Phase 3 project and multi-file CRUD, plus learner sessions with event ingestion and session closing.
+- Added user-ownership checks, code/event size limits, and a defensive in-memory per-session event-batch limit.
+- Added and applied the Phase 3 PostgreSQL migration; Alembic confirms it matches the ORM schema.
+
+### Files Added
+- `app/models/project.py`
+- `app/repositories/project_repository.py`
+- `app/schemas/projects.py`
+- `app/schemas/sessions.py`
+- `app/services/project_service.py`
+- `app/services/session_service.py`
+- `alembic/versions/20260717_0002_create_projects_and_sessions.py`
+- `tests/test_projects.py`
+
+### Files Modified
+- Routers, model exports, application wiring, exceptions, implementation plan, and development log.
+
+### Decisions
+- Store session event batches in a JSONB column on PostgreSQL, retaining the most recent 500 events.
+- Use an in-memory 20-batch-per-minute guard until Redis-backed rate limiting is added during hardening.
+
+### Known Limitations
+- Session rate-limit counters reset when the API process restarts and are not yet shared across instances.
+
+### TODO / Next Recommended Step
+- Confirm Phase 3, then implement Phase 4 self-hosted Piston execution and persisted execution runs.
+
+## 2026-07-17 01:35
+
+### Completed
+- Added Phase 4 execution persistence, Piston-backed `POST /execution/run`, and the `execution_runs` migration.
+- Added a code-runner panel to the local `/demo/` UI.
+- Applied migration `20260717_0003` and confirmed no pending Alembic operations.
+
+### Files Added
+- `app/models/execution.py`
+- `app/schemas/execution.py`
+- `alembic/versions/20260717_0003_create_execution_runs.py`
+
+### Files Modified
+- Execution router/service, application wiring, demo UI, models, Docker Compose, and development log.
+
+### Decisions
+- Enforce server-side Piston limits of 10 seconds compile time and 3 seconds run time.
+- Persist normalized output, error text, exit code, language/version, and source snapshot for every attempted run.
+
+### Known Limitations
+- The self-hosted Piston container starts correctly after adding its `/piston` data volume, but the image has no language runtimes installed. Python execution remains blocked until a compatible runtime package is provisioned.
+- Problem submission/grading is deferred until Phase 13 supplies problems and hidden tests.
+
+### TODO / Next Recommended Step
+- Provision a Python runtime in Piston, execute a real program through `/execution/run`, and then mark Phase 4 complete.
+
+## 2026-07-17 01:40
+
+### Completed
+- Corrected the demo UI's request-header merge so authenticated JSON requests preserve `Content-Type: application/json`.
+
+### Files Added
+- None.
+
+### Files Modified
+- `app/static/index.html`
+- `log.md`
+
+### Decisions
+- Apply the caller's request options before building merged headers, preventing the authorization header from replacing content type.
+
+### Known Limitations
+- The runner requires a UUID session ID created by the sessions API and a provisioned Piston language runtime.
+
+### TODO / Next Recommended Step
+- Create a project and session, then supply that session UUID to the demo runner after Piston Python is provisioned.
 
 ## 2026-07-17 00:38
 

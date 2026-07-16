@@ -10,7 +10,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.routers.auth import router as auth_router
+from app.api.routers.execution import router as execution_router
 from app.api.routers.health import router as health_router
+from app.api.routers.projects import router as projects_router
+from app.api.routers.sessions import router as sessions_router
 from app.api.routers.users import router as users_router
 from app.core.config import get_settings
 from app.core.exceptions import AppError
@@ -43,6 +46,9 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(projects_router)
+app.include_router(sessions_router)
+app.include_router(execution_router)
 app.mount("/demo", StaticFiles(directory="app/static", html=True), name="demo")
 
 

@@ -52,6 +52,14 @@
           <button class="secondary" type="button" id="me-button">Load my profile</button>
         </form>
 
+        <form class="card wide" id="runner-form">
+          <h2>Run Python code</h2>
+          <label for="runner-session">Learning session ID</label><input id="runner-session" placeholder="Leave blank to create a scratch session automatically" />
+          <label for="runner-code">Code</label><input id="runner-code" value="print('Hello from Piston!')" required />
+          <button>Run code</button>
+          <p class="hint">Uses <code>POST /execution/run</code>. Start Piston with <code>docker compose up -d piston</code>.</p>
+        </form>
+
         <section class="card wide">
           <h2>API response</h2>
           <pre id="output">Use the forms above. The demo calls the same FastAPI endpoints documented at /docs.</pre>
@@ -63,7 +71,10 @@
       const output = document.querySelector('#output');
       const show = (value) => output.textContent = JSON.stringify(value, null, 2);
       const request = async (path, options = {}) => {
-        const response = await fetch(path, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options });
+        const response = await fetch(path, {
+          ...options,
+          headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+        });
         const body = response.status === 204 ? { status: 'ok' } : await response.json();
         if (!response.ok) throw body;
         return body;
@@ -96,6 +107,22 @@
           const token = localStorage.getItem('mentor_access_token');
           if (!token) throw { detail: 'Log in first so the demo has an access token.' };
           show(await request('/users/me', { headers: { Authorization: `Bearer ${token}` } }));
+        } catch (error) { show(error); }
+      });
+      document.querySelector('#runner-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        try {
+          const token = localStorage.getItem('mentor_access_token');
+          if (!token) throw { detail: 'Log in first.' };
+          const headers = { Authorization: `Bearer ${token}` };
+          let sessionId = document.querySelector('#runner-session').value;
+          if (!sessionId) {
+            const project = await request('/projects', { method: 'POST', headers, body: JSON.stringify({ name: 'Scratch runner', language: 'python' }) });
+            const session = await request('/sessions', { method: 'POST', headers, body: JSON.stringify({ project_id: project.id }) });
+            sessionId = session.id;
+            document.querySelector('#runner-session').value = sessionId;
+          }
+          show(await request('/execution/run', { method: 'POST', headers, body: JSON.stringify({ session_id: sessionId, code: document.querySelector('#runner-code').value, language: 'python', version: '*' }) }));
         } catch (error) { show(error); }
       });
       request('/health').then(() => document.querySelector('#health').textContent = 'API online — Phase 2 auth ready').catch(() => document.querySelector('#health').textContent = 'API unavailable — start Uvicorn first');

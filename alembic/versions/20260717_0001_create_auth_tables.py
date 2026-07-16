@@ -56,6 +56,4 @@ def downgrade() -> None:
     op.drop_index("ix_refresh_tokens_user_id", table_name="refresh_tokens")
     op.drop_table("refresh_tokens")
     op.drop_table("users")
-    postgresql.ENUM("student", "instructor", name="user_role").drop(
-        op.get_bind(), checkfirst=True
-    )
+    postgresql.ENUM("student", "instructor", name="user_role").drop(op.get_bind(), checkfirst=True)
