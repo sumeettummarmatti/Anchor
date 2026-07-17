@@ -9,7 +9,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.ml.data.synthetic_problems import SyntheticProblem, synthetic_problem_catalog
+from app.ml.data.synthetic_problems import (
+    LANGUAGES,
+    TOPICS,
+    SyntheticProblem,
+    synthetic_problem_catalog,
+)
 from app.ml.features import problem_feature_vector, user_feature_vector
 
 
@@ -30,54 +35,82 @@ class TrainingPair:
 
 
 def stub_learners() -> list[StubLearner]:
-    common = {"language": "python"}
-    return [
-        StubLearner(
-            "stub-fast-clean-solver",
-            "fast_clean_solver",
-            {
-                **common,
-                "hint_depth_ceiling": 5,
-                "teaching_style": "socratic",
-                "difficulty_adjustment": 0.8,
-                "rolling_hint_rate": 0.2,
-                "rolling_failed_run_ratio": 0.05,
-                "rolling_avg_solve_time_seconds": 90.0,
-                "topic_strengths": {
-                    topic: 0.85 for topic in ("arrays", "strings", "hashing", "sorting")
+    """Return 20 deterministic learner profiles for local recommender validation.
+
+    Each profile combines a focus topic, preferred language, teaching style, skill level,
+    hint dependence, and failed-run history.  They intentionally represent different
+    learners, rather than 20 copies of one archetype, so training and ranking tests can
+    prove that the model responds to learner-specific signals.
+    """
+
+    specs = (
+        ("arrays_novice", "arrays", "python", "scaffolded", -0.85, 1.8, 0.80, 520),
+        ("arrays_builder", "arrays", "javascript", "encouraging", -0.25, 1.1, 0.35, 300),
+        ("arrays_solver", "arrays", "python", "socratic", 0.65, 0.3, 0.08, 100),
+        ("strings_novice", "strings", "java", "scaffolded", -0.70, 1.7, 0.72, 480),
+        ("strings_solver", "strings", "python", "socratic", 0.55, 0.25, 0.10, 120),
+        ("hashing_builder", "hashing", "javascript", "encouraging", 0.00, 1.0, 0.28, 260),
+        ("hashing_solver", "hashing", "python", "socratic", 0.80, 0.15, 0.06, 90),
+        ("recursion_novice", "recursion", "java", "scaffolded", -0.90, 1.9, 0.85, 560),
+        ("recursion_builder", "recursion", "python", "encouraging", -0.10, 1.25, 0.40, 320),
+        ("recursion_solver", "recursion", "javascript", "socratic", 0.50, 0.4, 0.15, 180),
+        ("sorting_builder", "sorting", "python", "encouraging", 0.15, 0.8, 0.25, 240),
+        ("sorting_solver", "sorting", "java", "socratic", 0.70, 0.2, 0.08, 110),
+        ("graphs_novice", "graphs", "python", "scaffolded", -0.80, 1.8, 0.78, 540),
+        ("graphs_builder", "graphs", "javascript", "encouraging", -0.20, 1.3, 0.45, 340),
+        ("graphs_solver", "graphs", "java", "socratic", 0.60, 0.3, 0.12, 160),
+        (
+            "dynamic_programming_novice",
+            "dynamic_programming",
+            "python",
+            "scaffolded",
+            -0.95,
+            2.0,
+            0.90,
+            580,
+        ),
+        (
+            "dynamic_programming_builder",
+            "dynamic_programming",
+            "java",
+            "encouraging",
+            -0.35,
+            1.4,
+            0.50,
+            380,
+        ),
+        ("databases_builder", "databases", "javascript", "encouraging", 0.10, 0.8, 0.25, 250),
+        ("databases_solver", "databases", "python", "socratic", 0.75, 0.2, 0.06, 100),
+        ("cross_topic_explorer", "sorting", "javascript", "socratic", 0.00, 0.7, 0.20, 210),
+    )
+    learners: list[StubLearner] = []
+    for name, focus, language, style, adjustment, hint_rate, failed_ratio, solve_time in specs:
+        topic_strengths = {topic: 0.25 for topic in TOPICS}
+        topic_strengths[focus] = 0.95
+        language_preferences = {item: 0.2 for item in LANGUAGES}
+        language_preferences[language] = 0.95
+        learners.append(
+            StubLearner(
+                id=f"stub-{name}",
+                archetype=name,
+                profile={
+                    "language": language,
+                    "language_preferences": language_preferences,
+                    "hint_depth_ceiling": 3
+                    if failed_ratio >= 0.7
+                    else 4
+                    if hint_rate >= 1.2
+                    else 5,
+                    "teaching_style": style,
+                    "difficulty_adjustment": adjustment,
+                    "rolling_hint_rate": hint_rate,
+                    "rolling_failed_run_ratio": failed_ratio,
+                    "rolling_avg_solve_time_seconds": float(solve_time),
+                    "topic_strengths": topic_strengths,
                 },
-            },
-        ),
-        StubLearner(
-            "stub-steady-builder",
-            "steady_builder",
-            {
-                **common,
-                "hint_depth_ceiling": 4,
-                "teaching_style": "encouraging",
-                "difficulty_adjustment": 0.0,
-                "rolling_hint_rate": 0.9,
-                "rolling_failed_run_ratio": 0.3,
-                "rolling_avg_solve_time_seconds": 260.0,
-            },
-        ),
-        StubLearner(
-            "stub-frequent-stuck",
-            "frequent_stuck",
-            {
-                **common,
-                "hint_depth_ceiling": 3,
-                "teaching_style": "scaffolded",
-                "difficulty_adjustment": -0.8,
-                "rolling_hint_rate": 1.8,
-                "rolling_failed_run_ratio": 0.8,
-                "rolling_avg_solve_time_seconds": 520.0,
-                "topic_strengths": {
-                    topic: 0.3 for topic in ("graphs", "dynamic_programming", "recursion")
-                },
-            },
-        ),
-    ]
+            )
+        )
+    return learners
 
 
 def interaction_label(learner: StubLearner, problem: SyntheticProblem) -> int:
@@ -90,7 +123,8 @@ def interaction_label(learner: StubLearner, problem: SyntheticProblem) -> int:
         if isinstance(strength_map, dict)
         else 0.5
     )
-    productive_struggle = abs(problem.difficulty - skill) <= 1.1 and 0.2 <= strength <= 0.9
+    productive_struggle = strength >= 0.75 and abs(problem.difficulty - skill) <= 1.25
+
     return int(productive_struggle)
 
 

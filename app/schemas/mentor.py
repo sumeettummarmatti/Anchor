@@ -34,9 +34,22 @@ class ExplainErrorRequest(BaseModel):
     diagnostics: list[Diagnostic] = Field(default_factory=list, max_length=100)
 
 
+class PersonalizationSummary(BaseModel):
+    """Safe learner signals shown alongside mentor output for explainable adaptation."""
+
+    hint_depth_ceiling: int = Field(ge=1, le=5)
+    teaching_style: str
+    difficulty_adjustment: float
+    intervention_frequency: float = Field(ge=0, le=1)
+    rolling_hint_rate: float = Field(ge=0)
+    rolling_failed_run_ratio: float = Field(ge=0, le=1)
+    rolling_avg_solve_time_seconds: float = Field(ge=0)
+
+
 class MentorResponse(BaseModel):
     message: str
     model: str
+    personalization: PersonalizationSummary | None = None
 
 
 class HintResponse(MentorResponse):

@@ -104,6 +104,8 @@ print(greet("learner"))</textarea>
           <label for="runtime-error">Runtime/compiler error</label>
           <textarea class="small" id="runtime-error" placeholder="Paste an error here"></textarea>
           <button type="button" id="explain" class="secondary">Explain error</button>
+          <h3>Personalization applied</h3>
+          <pre id="personalization-output">Ask the mentor to see the learner profile used.</pre>
         </section>
 
         <section class="card">
@@ -126,6 +128,11 @@ print(greet("learner"))</textarea>
       const output = $('output');
       const token = () => localStorage.getItem('mentor_access_token');
       const show = (value) => { output.textContent = JSON.stringify(value, null, 2); };
+      const showMentor = (value) => {
+        show(value);
+        if (value?.personalization) $('personalization-output').textContent = JSON.stringify(value.personalization, null, 2);
+      };
+
       const showError = (error) => show(error?.detail || error);
       const request = async (path, options = {}) => {
         const headers = { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) };
@@ -186,6 +193,13 @@ print(greet("learner"))</textarea>
           const sessionId = await ensureSession();
           const version = $('language').value === 'python' ? '3.10.0' : '18.15.0';
           show(await request('/execution/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, version, stdin: $('stdin').value }) }));
+        } catch (error) { showError(error); }
+      });
+      $('recommend').addEventListener('click', async () => {
+        try {
+          const recommendations = await request('/problems/recommended?k=5', { headers: authHeaders() });
+          $('recommendation-output').textContent = JSON.stringify(recommendations, null, 2);
+          show(recommendations);
         } catch (error) { showError(error); }
       });
       $('chat').addEventListener('click', async () => {

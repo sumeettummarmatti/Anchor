@@ -4,9 +4,7 @@ from uuid import UUID
 from httpx import AsyncClient
 
 from app.ml.data.synthetic_interactions import stub_learners
-from app.ml.data.synthetic_problems import synthetic_problem_catalog
-from app.ml.features import problem_feature_vector, user_feature_vector
-from app.ml.train_recommender import train
+from app.ml.train_recommender import rank_for_learner, train, validate_model
 from app.services.recommendation_service import RecommendationService
 from tests.test_projects import token_for
 
@@ -48,25 +46,26 @@ async def test_recommendation_artifacts_load(client: AsyncClient, tmp_path: Path
     assert {item.source for item in recommendations} == {"bi_encoder"}
 
 
-def test_stub_archetypes_show_directional_recommendations(tmp_path: Path) -> None:
-    model, _ = train(epochs=20, artifact_dir=tmp_path / "recommender")
-    catalog = synthetic_problem_catalog()
-    means: dict[str, float] = {}
-    for learner in stub_learners():
-        user_embedding = model.encode_user(user_feature_vector(learner.profile))
-        ranked = sorted(
-            (
-                sum(
-                    a * b
-                    for a, b in zip(
-                        user_embedding,
-                        model.encode_problem(problem_feature_vector(problem)),
-                        strict=True,
-                    )
-                ),
-                problem,
-            )
-            for problem in catalog
-        )[-5:]
-        means[learner.archetype] = sum(item[1].difficulty for item in ranked) / len(ranked)
-    assert means["fast_clean_solver"] > means["frequent_stuck"]
+def test_twenty_stub_learners_produce_personalized_rankings(tmp_path: Path) -> None:
+    learners = stub_learners()
+    assert len(learners) == 20
+    assert len({repr(learner.profile) for learner in learners}) == 20
+
+    model, losses = train(epochs=20, artifact_dir=tmp_path / "recommender")
+    validation = validate_model(model, learners)
+
+    assert len(losses) == 20
+    assert losses[-1] < losses[0]
+    assert validation["learner_count"] == 20
+    assert validation["unique_top_k_rankings"] >= 10
+    assert validation["focus_topic_hit_rate"] >= 0.5
+
+    novice = next(learner for learner in learners if learner.archetype == "arrays_novice")
+    solver = next(learner for learner in learners if learner.archetype == "arrays_solver")
+    novice_difficulty = (
+        sum(problem.difficulty for _, problem in rank_for_learner(model, novice)) / 5
+    )
+    solver_difficulty = (
+        sum(problem.difficulty for _, problem in rank_for_learner(model, solver)) / 5
+    )
+    assert solver_difficulty > novice_difficulty

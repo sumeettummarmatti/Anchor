@@ -97,3 +97,7 @@ async def test_chat_and_error_explanation_use_prompt_context(
     assert error.status_code == 200
     assert [context.intent for context in contexts] == ["chat", "explain_error"]
     assert contexts[1].runtime_error is not None
+    assert contexts[0].adaptation is not None
+    assert "Learner adaptation:" in contexts[0].as_prompt()
+    assert chat.json()["personalization"]["teaching_style"] == "socratic"
+    assert error.json()["personalization"]["hint_depth_ceiling"] == 5

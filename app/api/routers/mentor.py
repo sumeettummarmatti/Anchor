@@ -1,3 +1,6 @@
+from dataclasses import asdict
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,8 +14,16 @@ from app.schemas.mentor import (
     MentorChatRequest,
     MentorHintRequest,
     MentorResponse,
+    PersonalizationSummary,
 )
 from app.services.mentor_service import MentorService
+from app.services.personalization_service import PersonalizationService
+
+
+async def _personalization_summary(session: AsyncSession, user_id: UUID) -> PersonalizationSummary:
+    context = await PersonalizationService(session).get_context(user_id)
+    return PersonalizationSummary.model_validate(asdict(context))
+
 
 router = APIRouter(prefix="/mentor", tags=["mentor"])
 
@@ -25,7 +36,11 @@ async def chat(
     settings: Settings = Depends(get_settings),
 ) -> MentorResponse:
     message, model = await MentorService(session, settings).chat(current_user.id, payload)
-    return MentorResponse(message=message, model=model)
+    return MentorResponse(
+        message=message,
+        model=model,
+        personalization=await _personalization_summary(session, current_user.id),
+    )
 
 
 @router.post("/hint", response_model=HintResponse)
@@ -39,6 +54,7 @@ async def hint(
     return HintResponse(
         message=event.response,
         model=model,
+        personalization=await _personalization_summary(session, current_user.id),
         hint_id=event.id,
         level=event.level,
         created_at=event.created_at,
@@ -53,4 +69,8 @@ async def explain_error(
     settings: Settings = Depends(get_settings),
 ) -> MentorResponse:
     message, model = await MentorService(session, settings).explain_error(current_user.id, payload)
-    return MentorResponse(message=message, model=model)
+    return MentorResponse(
+        message=message,
+        model=model,
+        personalization=await _personalization_summary(session, current_user.id),
+    )

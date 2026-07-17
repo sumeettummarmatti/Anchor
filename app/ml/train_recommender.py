@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 
-from app.ml.data.synthetic_interactions import generate_training_pairs, stub_learners
-from app.ml.data.synthetic_problems import synthetic_problem_catalog
+from app.ml.data.synthetic_interactions import StubLearner, generate_training_pairs, stub_learners
+from app.ml.data.synthetic_problems import SyntheticProblem, synthetic_problem_catalog
 from app.ml.features import problem_feature_vector, user_feature_vector
 from app.ml.models.bi_encoder import BiEncoder
 
@@ -39,17 +40,17 @@ def train(epochs: int, artifact_dir: Path) -> tuple[BiEncoder, list[float]]:
     return model, losses
 
 
-def _top_titles(
-    model: BiEncoder, profile: dict[str, object], k: int = 5
-) -> list[tuple[str, int, float]]:
-    catalog = synthetic_problem_catalog()
-    user_embedding = model.encode_user(user_feature_vector(profile))
+def rank_for_learner(
+    model: BiEncoder, learner: StubLearner, k: int = 5
+) -> list[tuple[float, SyntheticProblem]]:
+    """Rank the synthetic catalog for one learner profile."""
+    user_embedding = model.encode_user(user_feature_vector(learner.profile))
     ranked = sorted(
         (
             (
                 sum(
-                    a * b
-                    for a, b in zip(
+                    left * right
+                    for left, right in zip(
                         user_embedding,
                         model.encode_problem(problem_feature_vector(problem)),
                         strict=True,
@@ -57,14 +58,52 @@ def _top_titles(
                 ),
                 problem,
             )
-            for problem in catalog
+            for problem in synthetic_problem_catalog()
         ),
         key=lambda item: item[0],
+        reverse=True,
     )
-    return [
-        (problem.title, problem.difficulty, round(score, 3))
-        for score, problem in reversed(ranked[-k:])
-    ]
+    return ranked[: max(1, min(k, len(ranked)))]
+
+
+def validate_model(
+    model: BiEncoder, learners: list[StubLearner] | None = None, k: int = 5
+) -> dict[str, object]:
+    """Validate finite, non-empty, learner-specific rankings before serving artifacts."""
+    learners = learners or stub_learners()
+    rankings = {learner.archetype: rank_for_learner(model, learner, k) for learner in learners}
+    if not rankings or any(len(items) != k for items in rankings.values()):
+        raise ValueError("The recommender returned an empty or incomplete ranking.")
+    if any(not math.isfinite(score) for items in rankings.values() for score, _ in items):
+        raise ValueError("The recommender returned a non-finite score.")
+
+    signatures = {tuple(problem.id for _, problem in items) for items in rankings.values()}
+    focus_hits = 0
+    for learner in learners:
+        strengths = learner.profile.get("topic_strengths", {})
+        focus = max(strengths, key=strengths.get) if isinstance(strengths, dict) else None
+        if focus and any(focus in problem.topic_tags for _, problem in rankings[learner.archetype]):
+            focus_hits += 1
+    focus_hit_rate = focus_hits / len(learners)
+    if len(signatures) < max(8, len(learners) // 2) or focus_hit_rate < 0.5:
+        raise ValueError(
+            "The recommender is not sufficiently personalized: "
+            f"{len(signatures)} unique rankings, {focus_hit_rate:.0%} focus-topic hit rate."
+        )
+    return {
+        "learner_count": len(learners),
+        "unique_top_k_rankings": len(signatures),
+        "focus_topic_hit_rate": round(focus_hit_rate, 3),
+        "rankings": rankings,
+    }
+
+
+def _top_titles(
+    model: BiEncoder, profile: dict[str, object], k: int = 5
+) -> list[tuple[str, int, float]]:
+    learner = StubLearner("preview", "preview", profile)
+    ranked = rank_for_learner(model, learner, k)
+    return [(problem.title, problem.difficulty, round(score, 3)) for score, problem in ranked[:k]]
 
 
 def main() -> None:
@@ -73,8 +112,13 @@ def main() -> None:
     parser.add_argument("--artifact-dir", type=Path, default=DEFAULT_ARTIFACT_DIR)
     args = parser.parse_args()
     model, losses = train(max(1, args.epochs), args.artifact_dir)
+    learners = stub_learners()
+    validation = validate_model(model, learners)
+    print(f"trained learners: {validation['learner_count']}")
     print(f"final train loss: {losses[-1]:.4f}")
-    for learner in stub_learners():
+    print(f"unique top-5 rankings: {validation['unique_top_k_rankings']}")
+    print(f"focus-topic hit rate: {validation['focus_topic_hit_rate']:.0%}")
+    for learner in learners:
         print(f"{learner.archetype} top-5:")
         for title, difficulty, score in _top_titles(model, learner.profile):
             print(f"  {difficulty}/5  {score:+.3f}  {title}")
