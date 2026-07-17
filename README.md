@@ -1,35 +1,160 @@
 # AI Coding Mentor API
 
-Backend-only FastAPI service for an adaptive AI coding mentor. Swagger UI is at `/docs`.
+Backend-only FastAPI service for an adaptive coding mentor. It includes JWT auth, project/session
+workspaces, Piston execution, Ruff/ESLint static analysis, Ollama-backed mentor chat, progressive
+hints, and a browser demo UI.
 
-## Quick start
+## Requirements
 
-1. Copy `.env.example` to `.env` and set secrets/provider keys as needed.
-2. Install dependencies with `uv sync --all-groups`.
-3. Run locally with `uv run uvicorn app.main:app --reload`.
-4. Check `http://localhost:8000/health` and `http://localhost:8000/docs`.
+- Python 3.12+
+- [`uv`](https://docs.astral.sh/uv/)
+- Docker Desktop with Docker Compose
+- [Ollama](https://ollama.com/download) with the `qwen3:8b` model
 
-## Fresh local setup
+The default LLM is local Ollama. No OpenAI key is required for the default setup.
 
-Start Ollama in a separate terminal and confirm the local model is available:
+## Fresh setup on macOS
+
+Clone the repository and enter it:
 
 ```bash
-ollama serve
+git clone <your-repository-url>
+cd codex-hackathon
+cp .env.example .env
+```
+
+Install and verify the local model:
+
+```bash
+ollama pull qwen3:8b
 ollama list
 ```
 
-For a host-run FastAPI server, start the dependencies and wait for their health checks before
-running migrations:
+Keep Ollama running in Terminal 1:
 
 ```bash
-docker compose up -d --wait postgres redis piston piston-init
-uv sync --all-groups
-uv run alembic upgrade head
-uv run uvicorn app.main:app --reload
+ollama serve
 ```
 
-If a fresh setup reports `role "mentor" does not exist`, an older local Postgres volume is being
-reused. This removes only this project's development database (not the Piston runtime cache):
+In Terminal 2, start the database, Redis, Piston, and the automatic Piston runtime seeder:
+
+```bash
+cd codex-hackathon
+docker compose up -d --wait postgres redis piston piston-init
+```
+
+The seeder installs Python `3.10.0` and Node `18.15.0` into Piston. The first run can take a few
+minutes. Confirm the runtimes are available:
+
+```bash
+curl http://127.0.0.1:2000/api/v2/runtimes
+```
+
+Install Python dependencies, apply migrations, and start the API:
+
+```bash
+uv sync --all-groups
+uv run alembic upgrade head
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+The host-run database uses `127.0.0.1:5433` because macOS machines often already have another
+Postgres server on port `5432`.
+
+## Docker-only API
+
+Use this instead of the local Uvicorn command if you want the API itself inside Docker:
+
+```bash
+docker compose up -d --build --wait
+docker compose exec api alembic upgrade head
+```
+
+Do not run the Docker API and local Uvicorn API at the same time; both use port `8000`.
+
+## Open the application
+
+Health check:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+Browser demo UI:
+
+```bash
+open http://127.0.0.1:8000/demo/
+```
+
+Swagger API documentation:
+
+```bash
+open http://127.0.0.1:8000/docs
+```
+
+In the demo UI:
+
+1. Create an account and log in.
+2. Create a scratch learning session.
+3. Enter Python code and click **Analyze code**.
+4. Click **Run code** to execute through Piston.
+5. Ask the local mentor a question.
+6. Request progressive hints one level at a time.
+
+## Phase 5 and 6 tests
+
+Run the complete automated suite:
+
+```bash
+uv run ruff check app tests
+uv run pytest -q
+```
+
+Phase-specific tests:
+
+```bash
+uv run pytest tests/test_static_analysis.py -q
+uv run pytest tests/test_mentor.py -q
+```
+
+The mentor unit tests mock the LLM provider. The running application uses Ollama through the
+OpenAI-compatible endpoint configured in `.env`:
+
+```dotenv
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_API_KEY=ollama
+OLLAMA_MODEL=qwen3:8b
+```
+
+## API endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /auth/register` | Create a learner account |
+| `POST /auth/login` | Obtain access and refresh tokens |
+| `POST /projects` | Create a coding project |
+| `POST /sessions` | Start a learning session |
+| `POST /static-analysis/run` | Run Ruff or ESLint analysis |
+| `POST /execution/run` | Analyze and execute code through Piston |
+| `POST /mentor/chat` | Ask a Socratic mentor question |
+| `POST /mentor/hint` | Request the next progressive hint |
+| `POST /mentor/explain-error` | Explain a runtime or compiler error |
+
+All endpoints except health and the public auth routes require an access token. Swagger can send
+the token after using the **Authorize** button.
+
+## Configuration
+
+The committed `.env.example` documents all settings. Copy it to `.env`; never commit `.env` or
+API keys. Supported LLM providers are Ollama (default), OpenAI, Groq, Hugging Face, and LM Studio.
+
+## Troubleshooting
+
+### Postgres reports `role "mentor" does not exist`
+
+This usually means an old development volume was initialized with different credentials. This
+deletes only this project's local database volume; it preserves the Piston runtime cache:
 
 ```bash
 docker compose down
@@ -38,51 +163,43 @@ docker compose up -d --wait postgres redis piston piston-init
 uv run alembic upgrade head
 ```
 
-The host-run database URL is `127.0.0.1:5433`, rather than the common `localhost:5432`: this
-avoids a locally installed Postgres taking precedence over Docker's port mapping on macOS.
+### Execution says `Code execution service is unavailable`
 
-To run the complete stack in Docker instead, use:
+Check that Piston is running and has runtimes:
 
 ```bash
-docker compose up -d --build --wait
-docker compose exec api alembic upgrade head
+docker compose ps
+curl http://127.0.0.1:2000/api/v2/runtimes
+docker compose logs -f piston
 ```
 
-## LLM provider selection
+If the runtime list is empty, run:
 
-`LLM_PROVIDER` selects the provider used by the internal `AIService`:
+```bash
+docker compose run --rm piston-init
+```
 
-| Value | Required configuration | Default model |
-| --- | --- | --- |
-| `ollama` (default) | local Ollama server at `OLLAMA_BASE_URL` | `qwen3:8b` |
-| `openai` | `OPENAI_API_KEY` | `gpt-4o-mini` |
-| `groq` | `GROQ_API_KEY` | `llama-3.3-70b-versatile` |
-| `huggingface` | `HF_API_KEY` | `meta-llama/Llama-3.3-70B-Instruct` |
-| `lmstudio` | local server at `LMSTUDIO_BASE_URL` | `local-model` |
+### Ollama logs
 
-The selection is centralized in `app/services/ai_service.py`; routes will never call a provider SDK directly.
+When Ollama is started manually, logs appear in its terminal. To save and follow them:
 
-For local development, start Ollama before the API (`ollama serve`) and ensure the configured
-model is present (`ollama pull qwen3:8b`). Docker Compose connects the API container to Ollama on
-the host at `host.docker.internal:11434`.
+```bash
+ollama serve 2>&1 | tee ~/ollama-server.log
+tail -f ~/ollama-server.log
+```
 
-## Authentication decision
+### View API logs
 
-Local access and refresh tokens use HS256 (HMAC-SHA-256) signed JWTs. Passwords use bcrypt; refresh-token records store only a SHA-256 digest. Google/GitHub OAuth client credentials are loaded from environment variables.
+```bash
+docker compose logs -f api
+```
 
-## Auth endpoints
+## Stop services
 
-- `POST /auth/register`, `/auth/login`, `/auth/refresh`, and `/auth/logout`
-- `GET /auth/oauth/google/login` and `/auth/oauth/github/login`, with matching callback routes
-- `GET /users/me` and `PATCH /users/me` (Bearer access token required)
+Stop the API and dependencies:
 
-Run `uv run alembic upgrade head` before using the auth endpoints against PostgreSQL. Set the Google or GitHub OAuth variables in `.env` before starting either provider flow.
+```bash
+docker compose down
+```
 
-## Static analysis and mentor endpoints
-
-`POST /static-analysis/run` runs Ruff for Python and ESLint when it is installed. Each
-`POST /execution/run` response now includes the same normalized analysis result and persists it.
-
-The protected mentor endpoints are `POST /mentor/chat`, `/mentor/hint`, and
-`/mentor/explain-error`. Hints require a learning-session ID and must be used in order;
-run `uv run alembic upgrade head` to create the `hint_events` table.
+Press `Ctrl+C` in the Ollama terminal to stop Ollama.
