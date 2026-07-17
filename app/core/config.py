@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     piston_request_timeout_seconds: float = Field(default=15, gt=0, le=60)
     static_analysis_timeout_seconds: float = Field(default=5, gt=0, le=30)
     llm_request_timeout_seconds: float = Field(default=30, gt=0, le=120)
+    recommendation_artifact_dir: str = "artifacts/recommender"
 
     llm_provider: LLMProvider = LLMProvider.OLLAMA
     ollama_base_url: str = "http://localhost:11434/v1"

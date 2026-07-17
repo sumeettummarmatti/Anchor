@@ -13,6 +13,7 @@ from app.repositories.hint_repository import HintRepository
 from app.schemas.mentor import ExplainErrorRequest, MentorChatRequest, MentorHintRequest
 from app.schemas.static_analysis import Diagnostic
 from app.services.ai_service import AIService, PromptContext
+from app.services.personalization_service import PersonalizationService
 from app.services.session_service import SessionService
 
 
@@ -27,15 +28,22 @@ class MentorService:
         self.ai = ai_service or AIService(settings)
 
     async def chat(self, user_id: UUID, payload: MentorChatRequest) -> tuple[str, str]:
+        adaptation = await PersonalizationService(self.session).get_context(user_id)
         diagnostics = await self._ground_diagnostics(
             user_id, payload.session_id, payload.execution_id, payload.diagnostics
         )
         context = PromptContext(
-            "chat", payload.language, payload.code, payload.message, tuple(diagnostics)
+            "chat",
+            payload.language,
+            payload.code,
+            payload.message,
+            tuple(diagnostics),
+            adaptation=adaptation,
         )
         return await self.ai.complete(context)
 
     async def explain_error(self, user_id: UUID, payload: ExplainErrorRequest) -> tuple[str, str]:
+        adaptation = await PersonalizationService(self.session).get_context(user_id)
         diagnostics = await self._ground_diagnostics(
             user_id, payload.session_id, None, payload.diagnostics
         )
@@ -46,15 +54,24 @@ class MentorService:
             "Explain this error.",
             tuple(diagnostics),
             payload.error,
+            adaptation=adaptation,
         )
         return await self.ai.complete(context)
 
     async def hint(self, user_id: UUID, payload: MentorHintRequest) -> tuple[HintEvent, str]:
         await SessionService(self.session).get(payload.session_id, user_id)
+        adaptation = await PersonalizationService(self.session).get_context(user_id)
         repository = HintRepository(self.session)
         next_level = (await repository.highest_level(user_id, payload.session_id)) + 1
         if next_level > 5:
             next_level = 5
+        if next_level > adaptation.hint_depth_ceiling:
+            from app.core.exceptions import ConflictError
+
+            raise ConflictError(
+                "Your current learner profile caps hints at "
+                f"level {adaptation.hint_depth_ceiling}. Keep working with the current guidance."
+            )
         if payload.level is not None and payload.level != next_level:
             from app.core.exceptions import ConflictError
 
@@ -69,6 +86,7 @@ class MentorService:
             payload.request,
             tuple(diagnostics),
             hint_level=next_level,
+            adaptation=adaptation,
         )
         response, model = await self.ai.complete(context)
         event = await repository.create(

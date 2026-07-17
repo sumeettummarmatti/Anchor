@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user
@@ -8,6 +8,7 @@ from app.db.session import get_db_session
 from app.models.project import LearningSession
 from app.models.user import User
 from app.schemas.sessions import EventBatch, SessionCreate, SessionResponse
+from app.services.personalization_service import update_profile_after_session
 from app.services.session_service import SessionService
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -57,7 +58,10 @@ async def ingest_events(
 @router.post("/{session_id}/end", response_model=SessionResponse)
 async def end_session(
     session_id: UUID,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> SessionResponse:
-    return response(await SessionService(session).end(session_id, current_user.id))
+    result = await SessionService(session).end(session_id, current_user.id)
+    background_tasks.add_task(update_profile_after_session, current_user.id)
+    return response(result)

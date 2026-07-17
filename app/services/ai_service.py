@@ -10,6 +10,7 @@ from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, OpenAIError
 from app.core.config import LLMProvider, Settings
 from app.core.exceptions import AIProviderError, ConfigurationError
 from app.schemas.static_analysis import Diagnostic
+from app.services.personalization_service import AdaptationContext
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class PromptContext:
     diagnostics: tuple[Diagnostic, ...] = field(default_factory=tuple)
     runtime_error: str | None = None
     hint_level: int | None = None
+    adaptation: AdaptationContext | None = None
 
     def as_prompt(self) -> str:
         diagnostics = (
@@ -49,6 +51,15 @@ class PromptContext:
             parts.insert(4, f"Runtime or compiler error:\n{self.runtime_error}")
         if self.hint_level is not None:
             parts.insert(1, f"Hint level: {self.hint_level} of 5")
+        if self.adaptation is not None:
+            parts.insert(
+                1,
+                "Learner adaptation: "
+                f"teaching style={self.adaptation.teaching_style}, "
+                f"hint ceiling={self.adaptation.hint_depth_ceiling}, "
+                f"difficulty adjustment={self.adaptation.difficulty_adjustment:+.2f}, "
+                f"intervention frequency={self.adaptation.intervention_frequency:.2f}.",
+            )
         return "\n\n".join(parts)
 
 

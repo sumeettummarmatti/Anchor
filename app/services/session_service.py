@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import NotFoundError
 from app.models.project import LearningSession
 from app.repositories.project_repository import ProjectRepository
+from app.services.personalization_service import PersonalizationService
 from app.services.project_service import ProjectService
 
 
@@ -25,6 +26,7 @@ class SessionService:
         await ProjectService(self.session).get(project_id, user_id)
         learning_session = LearningSession(user_id=user_id, project_id=project_id)
         self.session.add(learning_session)
+        await PersonalizationService(self.session).ensure_profile(user_id, commit=False)
         await self.session.commit()
         await self.session.refresh(learning_session)
         return learning_session

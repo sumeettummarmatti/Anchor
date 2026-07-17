@@ -100,8 +100,9 @@ In the demo UI:
 4. Click **Run code** to execute through Piston.
 5. Ask the local mentor a question.
 6. Request progressive hints one level at a time.
+7. End the session; the learner profile is updated in a background task.
 
-## Phase 5 and 6 tests
+## Phase 5, 6, and 7 tests
 
 Run the complete automated suite:
 
@@ -115,6 +116,7 @@ Phase-specific tests:
 ```bash
 uv run pytest tests/test_static_analysis.py -q
 uv run pytest tests/test_mentor.py -q
+uv run pytest tests/test_personalization.py -q
 ```
 
 The mentor unit tests mock the LLM provider. The running application uses Ollama through the
@@ -140,6 +142,48 @@ OLLAMA_MODEL=qwen3:8b
 | `POST /mentor/chat` | Ask a Socratic mentor question |
 | `POST /mentor/hint` | Request the next progressive hint |
 | `POST /mentor/explain-error` | Explain a runtime or compiler error |
+| `GET /users/me/profile` | Read the learner's adaptive profile |
+| `GET /problems/recommended` | Retrieve personalized stub-problem recommendations |
+
+### Learner profile and personalization
+
+Starting a session automatically creates a default profile for the authenticated learner. Ending
+the session schedules a non-blocking profile update using execution and hint history. The profile
+controls mentor teaching style, hint-depth ceiling, difficulty adjustment, and intervention
+frequency. Mentor chat, hints, and error explanations include this adaptation context automatically.
+
+Inspect the current profile with:
+
+```bash
+curl http://127.0.0.1:8000/users/me/profile \
+  -H "Authorization: Bearer <access-token>"
+```
+
+### Synthetic bi-encoder recommendations
+
+The recommendation prototype uses deterministic stub learners and a 48-problem catalog. This is
+development data only; retrain it on real analytics events before treating scores as product
+recommendations. Train the local CPU model with:
+
+```bash
+uv run python -m app.ml.train_recommender --epochs 20
+```
+
+The command writes ignored artifacts under `artifacts/recommender/` and prints top-five results
+for `fast_clean_solver`, `steady_builder`, and `frequent_stuck`. The API loads those artifacts
+lazily. Without them, the endpoint remains available using a rule-based fallback:
+
+```bash
+curl "http://127.0.0.1:8000/problems/recommended?k=5" \
+  -H "Authorization: Bearer <access-token>"
+```
+
+Each result contains `source: "bi_encoder"` after training or `source: "rule_fallback"` before
+training. The test that checks the directional signal is:
+
+```bash
+uv run pytest tests/test_recommendation_service.py -q
+```
 
 All endpoints except health and the public auth routes require an access token. Swagger can send
 the token after using the **Authorize** button.

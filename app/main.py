@@ -13,6 +13,7 @@ from app.api.routers.auth import router as auth_router
 from app.api.routers.execution import router as execution_router
 from app.api.routers.health import router as health_router
 from app.api.routers.mentor import router as mentor_router
+from app.api.routers.problems import router as problems_router
 from app.api.routers.projects import router as projects_router
 from app.api.routers.sessions import router as sessions_router
 from app.api.routers.static_analysis import router as static_analysis_router
@@ -49,6 +50,7 @@ app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(projects_router)
+app.include_router(problems_router)
 app.include_router(sessions_router)
 app.include_router(execution_router)
 app.include_router(static_analysis_router)
