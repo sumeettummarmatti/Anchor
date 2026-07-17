@@ -6,6 +6,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://mentor:mentor@postgres:5432/mentor
       REDIS_URL: redis://redis:6379/0
       PISTON_BASE_URL: http://piston:2000
+      OLLAMA_BASE_URL: http://host.docker.internal:11434/v1
     ports:
       - "8000:8000"
     depends_on:
@@ -15,6 +16,10 @@ services:
         condition: service_healthy
       piston:
         condition: service_started
+      piston-init:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   postgres:
     image: pgvector/pgvector:pg16
@@ -23,7 +28,7 @@ services:
       POSTGRES_USER: mentor
       POSTGRES_PASSWORD: mentor
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -49,6 +54,30 @@ services:
       - "2000:2000"
     volumes:
       - piston_data:/piston
+
+  piston-init:
+    image: curlimages/curl:8.11.1
+    depends_on:
+      piston:
+        condition: service_started
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        until curl --fail --silent http://piston:2000/api/v2/packages >/dev/null; do sleep 2; done
+        runtimes="$$(curl --fail --silent http://piston:2000/api/v2/runtimes)"
+        if ! printf '%s' "$${runtimes}" | grep -q '"language":"python".*"version":"3.10.0"'; then
+          curl --fail --show-error --request POST http://piston:2000/api/v2/packages \
+            --header 'Content-Type: application/json' \
+            --data '{"language":"python","version":"3.10.0"}'
+        fi
+        runtimes="$$(curl --fail --silent http://piston:2000/api/v2/runtimes)"
+        if ! printf '%s' "$${runtimes}" | grep -q '"language":"javascript".*"version":"18.15.0"'; then
+          curl --fail --show-error --request POST http://piston:2000/api/v2/packages \
+            --header 'Content-Type: application/json' \
+            --data '{"language":"node","version":"18.15.0"}'
+        fi
 
 volumes:
   postgres_data:

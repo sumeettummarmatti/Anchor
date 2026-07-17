@@ -3,129 +3,211 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Coding Mentor — API Demo</title>
+    <title>Mentor Lab — Phase 5 & 6</title>
     <style>
       :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; color: #eaf0ff; background: radial-gradient(circle at 20% 0%, #1c345d 0, transparent 32%), #0b1120; }
-      main { width: min(980px, calc(100% - 32px)); margin: 56px auto; }
-      .eyebrow { color: #82aaff; font-size: .78rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
-      h1 { font-size: clamp(2rem, 6vw, 4.2rem); margin: .25rem 0 .65rem; letter-spacing: -.06em; }
-      .intro { color: #b9c6df; max-width: 640px; font-size: 1.08rem; line-height: 1.6; }
-      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 34px; }
-      .card { background: rgba(16, 27, 48, .88); border: 1px solid #2b4167; border-radius: 18px; padding: 24px; box-shadow: 0 16px 40px rgba(0, 0, 0, .2); }
-      .card.wide { grid-column: 1 / -1; }
-      h2 { margin: 0 0 16px; font-size: 1.15rem; }
-      label { display: block; color: #b9c6df; font-size: .84rem; margin: 12px 0 6px; }
-      input { width: 100%; border: 1px solid #3a527e; border-radius: 9px; padding: 11px; background: #0b1425; color: #fff; font: inherit; }
-      button { border: 0; border-radius: 9px; padding: 11px 15px; margin-top: 18px; background: #6d9cff; color: #081126; font-weight: 800; cursor: pointer; }
-      button.secondary { margin-left: 8px; background: #283b5d; color: #dce7ff; }
-      button:hover { filter: brightness(1.1); }
-      pre { overflow: auto; margin: 0; min-height: 90px; padding: 16px; border-radius: 10px; background: #07101e; color: #9fcbff; font-size: .82rem; line-height: 1.55; white-space: pre-wrap; }
-      .status { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; color: #9ee8bc; font-size: .9rem; }
+      body { margin: 0; min-height: 100vh; color: #edf3ff; background: radial-gradient(circle at 15% 0%, #203b6c 0, transparent 32%), #08101e; }
+      main { width: min(1180px, calc(100% - 32px)); margin: 36px auto 72px; }
+      .eyebrow { color: #8bb5ff; font-size: .75rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+      h1 { margin: .25rem 0 .5rem; font-size: clamp(2rem, 5vw, 4rem); letter-spacing: -.06em; }
+      .intro { max-width: 760px; color: #b7c6e0; line-height: 1.55; }
+      .status { display: inline-flex; align-items: center; gap: 8px; color: #9ee8bc; font-size: .86rem; }
       .dot { width: 9px; height: 9px; border-radius: 50%; background: #55d686; box-shadow: 0 0 15px #55d686; }
-      .hint { color: #8fa4c6; font-size: .83rem; line-height: 1.5; }
-      @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+      .grid { display: grid; grid-template-columns: 1.25fr .75fr; gap: 18px; margin-top: 28px; }
+      .card { background: rgba(15, 27, 48, .91); border: 1px solid #2b4167; border-radius: 18px; padding: 20px; box-shadow: 0 16px 40px rgba(0, 0, 0, .2); }
+      .wide { grid-column: 1 / -1; }
+      h2 { margin: 0 0 14px; font-size: 1.08rem; }
+      h3 { margin: 20px 0 8px; font-size: .9rem; color: #abc0e5; }
+      label { display: block; color: #b9c6df; font-size: .8rem; margin: 11px 0 6px; }
+      input, select, textarea { width: 100%; border: 1px solid #3a527e; border-radius: 9px; padding: 10px 11px; background: #091426; color: #fff; font: inherit; }
+      textarea { min-height: 260px; resize: vertical; line-height: 1.5; font-family: "SFMono-Regular", Consolas, monospace; font-size: .86rem; }
+      textarea.small { min-height: 90px; font-family: inherit; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      button { border: 0; border-radius: 9px; padding: 10px 13px; margin: 14px 6px 0 0; background: #76a5ff; color: #071126; font-weight: 800; cursor: pointer; }
+      button.secondary { background: #293e62; color: #dce7ff; }
+      button.ghost { background: transparent; color: #9dbfff; border: 1px solid #3a527e; }
+      button:hover { filter: brightness(1.12); }
+      .hint { color: #8fa4c6; font-size: .79rem; line-height: 1.5; }
+      pre { overflow: auto; min-height: 118px; max-height: 430px; margin: 0; padding: 14px; border-radius: 10px; background: #060e1b; color: #a9d1ff; font-size: .78rem; line-height: 1.5; white-space: pre-wrap; }
+      .pill { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #21385e; color: #a9c6ff; font-size: .73rem; font-weight: 700; }
+      .actions { display: flex; flex-wrap: wrap; align-items: center; }
+      code { color: #a9c6ff; }
+      @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } .wide { grid-column: auto; } .row { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
     <main>
-      <div class="eyebrow">Local API demo</div>
-      <h1>Meet your coding mentor.</h1>
-      <p class="intro">A tiny visual shell for exercising Phase 2. Create an account, log in, and inspect the authenticated learner profile without Postman.</p>
+      <div class="eyebrow">Local API demo · phases 5 & 6</div>
+      <h1>Mentor Lab.</h1>
+      <p class="intro">Meet your coding mentor in a small browser workspace for running code, inspecting Ruff diagnostics, and asking your local Ollama model for Socratic guidance.</p>
       <div class="status"><span class="dot"></span><span id="health">Checking API health…</span></div>
 
       <section class="grid">
-        <form class="card" id="register-form">
-          <h2>Create learner account</h2>
-          <label for="register-name">Display name</label><input id="register-name" value="Ada Learner" required />
-          <label for="register-email">Email</label><input id="register-email" type="email" placeholder="ada@example.com" required />
-          <label for="register-password">Password</label><input id="register-password" type="password" minlength="8" value="mentor-demo-123" required />
-          <button>Create account</button>
+        <form class="card" id="auth-form">
+          <h2>1. Sign in</h2>
+          <label for="display-name">Display name (registration only)</label>
+          <input id="display-name" value="Ada Learner" />
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="ada@example.com" required />
+          <label for="password">Password</label>
+          <input id="password" type="password" value="mentor-demo-123" minlength="8" required />
+          <div class="actions">
+            <button type="button" id="register">Create account</button>
+            <button type="submit" class="secondary">Log in</button>
+            <button type="button" class="ghost" id="profile">My profile</button>
+          </div>
+          <p class="hint" id="auth-state">No access token stored.</p>
         </form>
 
-        <form class="card" id="login-form">
-          <h2>Log in</h2>
-          <label for="login-email">Email</label><input id="login-email" type="email" placeholder="ada@example.com" required />
-          <label for="login-password">Password</label><input id="login-password" type="password" minlength="8" value="mentor-demo-123" required />
-          <button>Get tokens</button>
-          <button class="secondary" type="button" id="me-button">Load my profile</button>
-        </form>
-
-        <form class="card wide" id="runner-form">
-          <h2>Run Python code</h2>
-          <label for="runner-session">Learning session ID</label><input id="runner-session" placeholder="Leave blank to create a scratch session automatically" />
-          <label for="runner-code">Code</label><input id="runner-code" value="print('Hello from Piston!')" required />
-          <button>Run code</button>
-          <p class="hint">Uses <code>POST /execution/run</code>. Start Piston with <code>docker compose up -d piston</code>.</p>
+        <form class="card" id="session-form">
+          <h2>2. Workspace <span class="pill">session</span></h2>
+          <label for="session-id">Learning session ID</label>
+          <input id="session-id" placeholder="Create one below" />
+          <button type="submit">Create scratch session</button>
+          <p class="hint">Hints are stored against this session and must be requested in order.</p>
+          <pre id="session-output">No session yet.</pre>
         </form>
 
         <section class="card wide">
-          <h2>API response</h2>
-          <pre id="output">Use the forms above. The demo calls the same FastAPI endpoints documented at /docs.</pre>
-          <p class="hint">Development-only convenience: this page stores the access token in this browser's local storage. Do not use this pattern for a production client.</p>
+          <div class="row">
+            <div>
+              <h2>3. Code workspace</h2>
+              <label for="language">Language</label>
+              <select id="language"><option value="python">Python</option><option value="javascript">JavaScript</option></select>
+            </div>
+            <div>
+              <label for="stdin">Standard input</label>
+              <input id="stdin" placeholder="Optional stdin" />
+              <p class="hint">Python analysis uses Ruff. Execution uses your local Piston service.</p>
+            </div>
+          </div>
+          <label for="code">Code</label>
+          <textarea id="code">import os
+
+def greet(name):
+    return f"Hello, {name}!"
+
+print(greet("learner"))</textarea>
+          <div class="actions">
+            <button type="button" id="analyze">Analyze code</button>
+            <button type="button" id="run" class="secondary">Run code</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>4. Mentor chat</h2>
+          <label for="chat-message">Question</label>
+          <textarea class="small" id="chat-message">What should I improve in this code?</textarea>
+          <button type="button" id="chat">Ask mentor</button>
+          <h3>Explain an error</h3>
+          <label for="runtime-error">Runtime/compiler error</label>
+          <textarea class="small" id="runtime-error" placeholder="Paste an error here"></textarea>
+          <button type="button" id="explain" class="secondary">Explain error</button>
+        </section>
+
+        <section class="card">
+          <h2>5. Progressive hints</h2>
+          <p class="hint">Each click advances one level. Skipping a level returns a conflict response.</p>
+          <button type="button" id="hint">Get next hint</button>
+          <p id="hint-level" class="pill">Next level: 1</p>
+          <pre id="hint-output">No hints requested.</pre>
+        </section>
+
+        <section class="card wide">
+          <h2>Response console</h2>
+          <pre id="output">Sign in, create a session, then try Analyze code.</pre>
+          <p class="hint">This development-only page stores the access token in local storage. Do not use this storage pattern for a production frontend.</p>
         </section>
       </section>
     </main>
     <script>
-      const output = document.querySelector('#output');
-      const show = (value) => output.textContent = JSON.stringify(value, null, 2);
+      const $ = (id) => document.querySelector(`#${id}`);
+      const output = $('output');
+      const token = () => localStorage.getItem('mentor_access_token');
+      const show = (value) => { output.textContent = JSON.stringify(value, null, 2); };
+      const showError = (error) => show(error?.detail || error);
       const request = async (path, options = {}) => {
-        const response = await fetch(path, {
-          ...options,
-          headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-        });
+        const headers = { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) };
+        const response = await fetch(path, { ...options, headers });
         const body = response.status === 204 ? { status: 'ok' } : await response.json();
         if (!response.ok) throw body;
         return body;
       };
-      document.querySelector('#register-form').addEventListener('submit', async (event) => {
-        event.preventDefault();
+      const authHeaders = () => {
+        if (!token()) throw { detail: 'Log in first.' };
+        return { Authorization: `Bearer ${token()}` };
+      };
+      const codePayload = () => ({ language: $('language').value, code: $('code').value });
+
+      $('register').addEventListener('click', async () => {
         try {
-          const user = await request('/auth/register', { method: 'POST', body: JSON.stringify({
-            display_name: document.querySelector('#register-name').value,
-            email: document.querySelector('#register-email').value,
-            password: document.querySelector('#register-password').value,
-          }) });
-          document.querySelector('#login-email').value = user.email;
+          const user = await request('/auth/register', { method: 'POST', body: JSON.stringify({ display_name: $('display-name').value, email: $('email').value, password: $('password').value }) });
+          $('auth-state').textContent = `Account created for ${user.email}. Log in next.`;
           show(user);
-        } catch (error) { show(error); }
+        } catch (error) { showError(error); }
       });
-      document.querySelector('#login-form').addEventListener('submit', async (event) => {
+      $('auth-form').addEventListener('submit', async (event) => {
         event.preventDefault();
         try {
-          const tokens = await request('/auth/login', { method: 'POST', body: JSON.stringify({
-            email: document.querySelector('#login-email').value,
-            password: document.querySelector('#login-password').value,
-          }) });
+          const tokens = await request('/auth/login', { method: 'POST', body: JSON.stringify({ email: $('email').value, password: $('password').value }) });
           localStorage.setItem('mentor_access_token', tokens.access_token);
-          show({ message: 'Logged in. Access token saved for this local demo.', token_type: tokens.token_type });
-        } catch (error) { show(error); }
+          $('auth-state').textContent = 'Logged in. Access token stored locally.';
+          show({ message: 'Logged in', token_type: tokens.token_type });
+        } catch (error) { showError(error); }
       });
-      document.querySelector('#me-button').addEventListener('click', async () => {
-        try {
-          const token = localStorage.getItem('mentor_access_token');
-          if (!token) throw { detail: 'Log in first so the demo has an access token.' };
-          show(await request('/users/me', { headers: { Authorization: `Bearer ${token}` } }));
-        } catch (error) { show(error); }
+      $('profile').addEventListener('click', async () => {
+        try { show(await request('/users/me', { headers: authHeaders() })); } catch (error) { showError(error); }
       });
-      document.querySelector('#runner-form').addEventListener('submit', async (event) => {
+      $('session-form').addEventListener('submit', async (event) => {
         event.preventDefault();
         try {
-          const token = localStorage.getItem('mentor_access_token');
-          if (!token) throw { detail: 'Log in first.' };
-          const headers = { Authorization: `Bearer ${token}` };
-          let sessionId = document.querySelector('#runner-session').value;
-          if (!sessionId) {
-            const project = await request('/projects', { method: 'POST', headers, body: JSON.stringify({ name: 'Scratch runner', language: 'python' }) });
-            const session = await request('/sessions', { method: 'POST', headers, body: JSON.stringify({ project_id: project.id }) });
-            sessionId = session.id;
-            document.querySelector('#runner-session').value = sessionId;
-          }
-          show(await request('/execution/run', { method: 'POST', headers, body: JSON.stringify({ session_id: sessionId, code: document.querySelector('#runner-code').value, language: 'python', version: '*' }) }));
-        } catch (error) { show(error); }
+          const headers = authHeaders();
+          const project = await request('/projects', { method: 'POST', headers, body: JSON.stringify({ name: 'Mentor Lab scratch', language: $('language').value }) });
+          const session = await request('/sessions', { method: 'POST', headers, body: JSON.stringify({ project_id: project.id }) });
+          $('session-id').value = session.id;
+          $('session-output').textContent = JSON.stringify(session, null, 2);
+          show({ project, session });
+        } catch (error) { showError(error); }
       });
-      request('/health').then(() => document.querySelector('#health').textContent = 'API online — Phase 2 auth ready').catch(() => document.querySelector('#health').textContent = 'API unavailable — start Uvicorn first');
+      const ensureSession = async () => {
+        if ($('session-id').value) return $('session-id').value;
+        const headers = authHeaders();
+        const project = await request('/projects', { method: 'POST', headers, body: JSON.stringify({ name: 'Mentor Lab scratch', language: $('language').value }) });
+        const session = await request('/sessions', { method: 'POST', headers, body: JSON.stringify({ project_id: project.id }) });
+        $('session-id').value = session.id;
+        return session.id;
+      };
+      $('analyze').addEventListener('click', async () => {
+        try { show(await request('/static-analysis/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify(codePayload()) })); } catch (error) { showError(error); }
+      });
+      $('run').addEventListener('click', async () => {
+        try {
+          const sessionId = await ensureSession();
+          const version = $('language').value === 'python' ? '3.10.0' : '18.15.0';
+          show(await request('/execution/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, version, stdin: $('stdin').value }) }));
+        } catch (error) { showError(error); }
+      });
+      $('chat').addEventListener('click', async () => {
+        try {
+          const sessionId = $('session-id').value || null;
+          show(await request('/mentor/chat', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, message: $('chat-message').value }) }));
+        } catch (error) { showError(error); }
+      });
+      $('explain').addEventListener('click', async () => {
+        try { show(await request('/mentor/explain-error', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: $('session-id').value || null, error: $('runtime-error').value }) })); } catch (error) { showError(error); }
+      });
+      $('hint').addEventListener('click', async () => {
+        try {
+          const sessionId = await ensureSession();
+          const response = await request('/mentor/hint', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, request: 'Give me the next useful hint.' }) });
+          $('hint-level').textContent = `Completed level: ${response.level} · next: ${Math.min(response.level + 1, 5)}`;
+          $('hint-output').textContent = response.message;
+          show(response);
+        } catch (error) { showError(error); }
+      });
+      request('/health').then(() => $('health').textContent = 'API online · Phase 5 & 6 ready').catch(() => $('health').textContent = 'API unavailable · start the backend first');
+      if (token()) $('auth-state').textContent = 'An access token is already stored in this browser.';
     </script>
   </body>
 </html>

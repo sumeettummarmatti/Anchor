@@ -18,7 +18,7 @@ async def run_code(
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> ExecutionResult:
-    execution, execution_time_ms = await ExecutionService(session, settings).run(
+    execution, execution_time_ms, analysis = await ExecutionService(session, settings).run(
         current_user.id, payload
     )
     return ExecutionResult(
@@ -28,4 +28,5 @@ async def run_code(
         exit_code=execution.exit_code,
         status=execution.status,
         execution_time_ms=execution_time_ms,
+        static_analysis=analysis,
     )

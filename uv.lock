@@ -20,6 +20,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "python-jose", extra = ["cryptography"] },
     { name = "redis" },
+    { name = "ruff" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "structlog" },
     { name = "uvicorn", extra = ["standard"] },
@@ -30,7 +31,6 @@ dev = [
     { name = "aiosqlite" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "ruff" },
 ]
 
 [package.metadata]
@@ -48,6 +48,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.7,<3.0" },
     { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3,<4.0" },
     { name = "redis", specifier = ">=5.2,<6.0" },
+    { name = "ruff", specifier = ">=0.9,<1.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.36,<3.0" },
     { name = "structlog", specifier = ">=24.4,<26.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34,<1.0" },
@@ -58,7 +59,6 @@ dev = [
     { name = "aiosqlite", specifier = ">=0.20,<1.0" },
     { name = "pytest", specifier = ">=8.3,<9.0" },
     { name = "pytest-asyncio", specifier = ">=0.24,<1.0" },
-    { name = "ruff", specifier = ">=0.9,<1.0" },
 ]
 
 [[package]]

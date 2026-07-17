@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class LLMProvider(StrEnum):
+    OLLAMA = "ollama"
     OPENAI = "openai"
     GROQ = "groq"
     HUGGINGFACE = "huggingface"
@@ -23,12 +24,17 @@ class Settings(BaseSettings):
     app_secret_key: str = "unsafe-development-secret-change-me"
     access_token_expire_minutes: int = Field(default=15, gt=0)
     refresh_token_expire_days: int = Field(default=30, gt=0)
-    database_url: str = "postgresql+asyncpg://mentor:mentor@localhost:5432/mentor"
+    database_url: str = "postgresql+asyncpg://mentor:mentor@127.0.0.1:5433/mentor"
     redis_url: str = "redis://localhost:6379/0"
     piston_base_url: str = "http://localhost:2000"
     piston_request_timeout_seconds: float = Field(default=15, gt=0, le=60)
+    static_analysis_timeout_seconds: float = Field(default=5, gt=0, le=30)
+    llm_request_timeout_seconds: float = Field(default=30, gt=0, le=120)
 
-    llm_provider: LLMProvider = LLMProvider.OPENAI
+    llm_provider: LLMProvider = LLMProvider.OLLAMA
+    ollama_base_url: str = "http://localhost:11434/v1"
+    ollama_api_key: str = "ollama"
+    ollama_model: str = "qwen3:8b"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
     groq_api_key: str | None = None

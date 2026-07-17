@@ -2,12 +2,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.static_analysis import StaticAnalysisResult
+
 
 class ExecutionRequest(BaseModel):
     session_id: UUID | None = None
     code: str = Field(min_length=1, max_length=200_000)
     language: str = Field(min_length=1, max_length=64)
-    version: str = Field(default="*", max_length=64)
+    version: str = Field(default="3.10.0", max_length=64)
     stdin: str = Field(default="", max_length=50_000)
 
 
@@ -19,3 +21,4 @@ class ExecutionResult(BaseModel):
     exit_code: int | None
     status: str
     execution_time_ms: int | None = None
+    static_analysis: StaticAnalysisResult | None = None
