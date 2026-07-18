@@ -2,16 +2,26 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+from uuid import UUID
 
 import httpx
+import structlog
 from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, OpenAIError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import LLMProvider, Settings
 from app.core.exceptions import AIProviderError, ConfigurationError
 from app.schemas.static_analysis import Diagnostic
 from app.services.personalization_service import AdaptationContext
+
+if TYPE_CHECKING:
+    from app.schemas.live_nudge import LiveNudgeRequest, LiveNudgeResponse
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -124,6 +134,31 @@ class AIService:
             return (LLMProvider.OLLAMA, LLMProvider.LMSTUDIO)
         return (configured,)
 
+    async def probe(
+        self, timeout_seconds: float = 3.0
+    ) -> tuple[bool, str | None, str | None, str | None]:
+        """Check provider/model readiness without sending a completion request."""
+        failures: list[str] = []
+        for provider in self.provider_order():
+            connection = self.connection(provider)
+            if not connection.api_key:
+                failures.append(f"{provider.value}: not configured")
+                continue
+            client = AsyncOpenAI(
+                api_key=connection.api_key,
+                base_url=connection.base_url,
+                timeout=httpx.Timeout(timeout_seconds, connect=1.5),
+                max_retries=0,
+            )
+            try:
+                model = await self._resolve_model(connection, client)
+                return True, provider.value, model, None
+            except Exception:
+                failures.append(f"{provider.value}: unavailable")
+            finally:
+                await client.close()
+        return False, None, None, "; ".join(failures) or "No LLM provider is configured."
+
     def _client_for(self, connection: LLMConnection, provider: LLMProvider) -> AsyncOpenAI:
         if self._client is not None and provider is self.settings.llm_provider:
             return self._client
@@ -154,12 +189,13 @@ class AIService:
 
     async def complete(self, context: PromptContext) -> tuple[str, str]:
         """Generate a response. Callers may supply context, never raw prompt strings."""
-        from app.prompt_templates import explain_error, mentor_chat, mentor_hint
+        from app.prompt_templates import explain_error, live_nudge, mentor_chat, mentor_hint
 
         builders = {
             "chat": mentor_chat.build,
             "hint": mentor_hint.build,
             "explain_error": explain_error.build,
+            "live_nudge": live_nudge.build,
         }
         try:
             builder = builders[context.intent]
@@ -184,12 +220,21 @@ class AIService:
                         {"role": "user", "content": user},
                     ],
                 }
+                if context.intent == "live_nudge":
+                    request["temperature"] = 0.2
+                    request["max_tokens"] = 96
                 if provider is LLMProvider.OLLAMA:
                     # Qwen's reasoning mode can be very slow locally. Keep it
                     # disabled by default and cap generated tokens.
                     request["extra_body"] = {
                         "think": self.settings.ollama_think,
-                        "options": {"num_predict": self.settings.ollama_num_predict},
+                        "options": {
+                            "num_predict": (
+                                min(self.settings.ollama_num_predict, 128)
+                                if context.intent == "live_nudge"
+                                else self.settings.ollama_num_predict
+                            )
+                        },
                     }
                 completion = await client.chat.completions.create(**request)
                 content = completion.choices[0].message.content if completion.choices else None
@@ -208,3 +253,106 @@ class AIService:
 
         detail = "AI providers unavailable. " + "; ".join(failures)
         raise AIProviderError(detail)
+
+    async def live_nudge(
+        self,
+        request: LiveNudgeRequest,
+        adaptation: AdaptationContext,
+        *,
+        session: AsyncSession,
+        user_id: UUID,
+    ) -> LiveNudgeResponse:
+        """Generate, suppress, and persist one short Live Tutor nudge."""
+        from app.core.live_nudge_state import (
+            check_rate_limit,
+            record_nudge,
+            should_suppress_posttrigger,
+            should_suppress_pretrigger,
+        )
+        from app.models.hint_event import HintEvent
+        from app.repositories.hint_repository import HintRepository
+        from app.schemas.live_nudge import LiveNudgeResponse, NudgeType
+
+        await check_rate_limit(user_id, request.session_id)
+        if await should_suppress_pretrigger(request.session_id):
+            return LiveNudgeResponse(
+                nudge="", nudge_type=NudgeType.encourage, stage="", should_display=False
+            )
+
+        context = PromptContext(
+            intent="live_nudge",
+            language=request.language,
+            code=request.code,
+            learner_message=request.client_detected_signal or "idle pause",
+            adaptation=adaptation,
+        )
+        raw_text, _model = await self.complete(context)
+        try:
+            parsed = self._parse_live_nudge_json(raw_text)
+            nudge = str(parsed.get("nudge", "")).strip()
+            nudge_type = NudgeType(parsed.get("nudge_type", NudgeType.encourage))
+            stage = str(parsed.get("stage", "unknown")).strip() or "unknown"
+        except (json.JSONDecodeError, TypeError, ValueError):
+            logger.warning(
+                "live_nudge_json_parse_failed",
+                user_id=str(user_id),
+                session_id=str(request.session_id),
+            )
+            # Reasoning models sometimes return a useful plain-text nudge
+            # instead of the requested JSON envelope. Keep that guidance
+            # visible rather than silently dropping the response.
+            import re
+
+            fallback = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
+            fallback = fallback.split(".", 1)[0].strip()[:2_000]
+            if fallback:
+                return LiveNudgeResponse(
+                    nudge=fallback,
+                    nudge_type=NudgeType.encourage,
+                    stage="exploring",
+                    should_display=True,
+                )
+            return LiveNudgeResponse(
+                nudge="", nudge_type=NudgeType.encourage, stage="unknown", should_display=False
+            )
+
+        if not nudge or await should_suppress_posttrigger(request.session_id, stage):
+            return LiveNudgeResponse(
+                nudge="", nudge_type=nudge_type, stage=stage, should_display=False
+            )
+
+        await record_nudge(request.session_id, stage)
+        await HintRepository(session).create(
+            HintEvent(
+                user_id=user_id,
+                session_id=request.session_id,
+                level=0,
+                prompt=request.code[:500],
+                response=nudge,
+                source="nudge",
+            )
+        )
+        return LiveNudgeResponse(
+            nudge=nudge, nudge_type=nudge_type, stage=stage, should_display=True
+        )
+
+    @staticmethod
+    def _parse_live_nudge_json(raw_text: str) -> dict[str, object]:
+        """Accept strict JSON plus the markdown fences local models often add."""
+        text = raw_text.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            if lines and lines[0].lstrip().startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+        if not text.startswith("{"):
+            start = text.find("{")
+            end = text.rfind("}")
+            if start >= 0 and end > start:
+                text = text[start : end + 1]
+        parsed = json.loads(text)
+        if not isinstance(parsed, dict):
+            raise TypeError("Live nudge JSON must be an object.")
+        return parsed

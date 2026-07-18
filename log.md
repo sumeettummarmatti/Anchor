@@ -301,3 +301,24 @@
 
 ### TODO / Next Recommended Step
 - Confirm Phase 1, then implement Phase 2 authentication and users with its first Alembic migration.
+## 2026-07-18 — Live Tutor + Rocky
+
+### Completed
+- Added Redis-backed Live Tutor nudge suppression, dismissal locks, and a fixed-window per-session rate limiter.
+- Added structured `live_nudge` prompting with learner-profile adaptation and JSON response parsing.
+- Added `/mentor/live-nudge` and `/mentor/live-nudge/feedback`, including `HintEvent.source` and its Alembic migration.
+- Added Rocky's draggable browser companion, Live Tutor toggle, pause detection, progressive-hint reuse, and feedback controls.
+- Added focused Redis, prompt, route, persistence, suppression, and rate-limit tests.
+
+### Cross-reference notes
+- Rate limiting is pulled forward from Phase 14 as a minimal live-nudge-specific limiter.
+- Live-nudge suppression overlaps with the future Phase 8 `stuck_detection_service`; consolidate signals when that phase lands.
+- Stage classification is LLM-inferred generically, not a per-problem stage table.
+- Rocky's state model is inspired by OpenPets, the Swift app by alterhq.
+
+### Verification
+- `uv run ruff check app tests`
+- `uv run pytest tests/test_live_nudge.py -q`
+- `uv run pytest -q` (33 passed)
+- `uv run alembic upgrade head` and `uv run alembic current` (`20260718_0007 (head)`)
+- Browser script syntax check with Node (`frontend script syntax: ok`)

@@ -14,6 +14,9 @@
       .intro { max-width: 760px; color: #b7c6e0; line-height: 1.55; }
       .status { display: inline-flex; align-items: center; gap: 8px; color: #9ee8bc; font-size: .86rem; }
       .dot { width: 9px; height: 9px; border-radius: 50%; background: #55d686; box-shadow: 0 0 15px #55d686; }
+      .llm-status { position: fixed; top: 16px; right: 18px; z-index: 10000; max-width: min(360px, calc(100vw - 36px)); padding: 8px 12px; border: 1px solid #49658e; border-radius: 999px; background: rgba(8, 16, 30, .94); color: #b7c6e0; box-shadow: 0 8px 24px rgba(0, 0, 0, .28); font-size: .75rem; font-weight: 800; }
+      .llm-status.ok { border-color: #55d686; color: #b8ffd0; }
+      .llm-status.unavailable { border-color: #ff8e8e; color: #ffc0c0; }
       .grid { display: grid; grid-template-columns: 1.25fr .75fr; gap: 18px; margin-top: 28px; }
       .card { background: rgba(15, 27, 48, .91); border: 1px solid #2b4167; border-radius: 18px; padding: 20px; box-shadow: 0 16px 40px rgba(0, 0, 0, .2); }
       .wide { grid-column: 1 / -1; }
@@ -33,14 +36,38 @@
       .pill { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #21385e; color: #a9c6ff; font-size: .73rem; font-weight: 700; }
       .actions { display: flex; flex-wrap: wrap; align-items: center; }
       code { color: #a9c6ff; }
+      #live-tutor-toggle.live-on { color: #b8ffd0; border-color: #55d686; }
+      #rocky { position: fixed; right: 22px; bottom: 22px; z-index: 9999; user-select: none; }
+      #rocky-character { display: flex; width: 96px; height: 82px; margin: 0; padding: 7px; flex-direction: column; align-items: center; justify-content: center; border: 2px solid #87b2ff; border-radius: 24px; background: linear-gradient(145deg, #8bb5ff, #5d83d4); color: #071126; box-shadow: 0 12px 32px rgba(0, 0, 0, .5), 0 0 24px rgba(118, 165, 255, .3); font-weight: 900; touch-action: none; }
+      .rocky-avatar { display: block; font-size: 2.2rem; line-height: 1; }
+      .rocky-name { display: block; margin-top: 4px; font-size: .72rem; letter-spacing: .04em; }
+      #rocky-character.running { animation: rocky-bob .7s ease-in-out infinite alternate; }
+      #rocky-character.shake { animation: rocky-shake .35s ease-in-out 2; }
+      .rocky-bubble { position: relative; width: min(360px, calc(100vw - 36px)); margin-bottom: 12px; padding: 16px; border: 1px solid #6e9cec; border-radius: 18px; background: #10213d; box-shadow: 0 16px 38px rgba(0, 0, 0, .5); }
+      .rocky-bubble::after { position: absolute; right: 30px; bottom: -11px; width: 20px; height: 20px; border-right: 1px solid #6e9cec; border-bottom: 1px solid #6e9cec; background: #10213d; content: ""; transform: rotate(45deg); }
+      .rocky-bubble.thinking { border-color: #76a5ff; }
+      .rocky-bubble[hidden] { display: none; }
+      .rocky-bubble p { margin: 0; color: #edf3ff; line-height: 1.45; }
+      .rocky-dots { display: inline-block; opacity: .65; animation: rocky-bob .5s ease-in-out infinite alternate; }
+      .rocky-meta { display: block; margin-top: 8px; color: #9dbfff; font-size: .72rem; }
+      .rocky-bubble button { margin-top: 10px; margin-right: 4px; padding: 7px 9px; font-size: .73rem; }
+      .rocky-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+      .rocky-actions button { margin-right: 0; }
+      .rocky-actions .agent-on { border-color: #55d686; color: #b8ffd0; background: #173d35; }
+      .rocky-reply { display: flex; gap: 6px; margin-top: 10px; }
+      .rocky-reply input { min-width: 0; margin: 0; padding: 8px 9px; font-size: .78rem; }
+      .rocky-reply button { flex: 0 0 auto; margin: 0; }
+      @keyframes rocky-bob { from { transform: translateY(0); } to { transform: translateY(-6px); } }
+      @keyframes rocky-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
       @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } .wide { grid-column: auto; } .row { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
+    <div id="llm-status" class="llm-status" role="status" aria-live="polite">LLM: checking…</div>
     <main>
       <div class="eyebrow">Local API demo · phases 5 & 6</div>
       <h1>Mentor Lab.</h1>
-      <p class="intro">Meet your coding mentor in a small browser workspace for running code, inspecting Ruff diagnostics, and asking your local Ollama model for Socratic guidance.</p>
+      <p class="intro">Meet your coding mentor in a small browser workspace for running code, inspecting Ruff diagnostics, and getting Socratic guidance from your local model.</p>
       <div class="status"><span class="dot"></span><span id="health">Checking API health…</span></div>
 
       <section class="grid">
@@ -65,6 +92,7 @@
           <label for="session-id">Learning session ID</label>
           <input id="session-id" placeholder="Create one below" />
           <button type="submit">Create scratch session</button>
+          <button type="button" id="live-tutor-toggle" class="ghost">🐾 Live Tutor: OFF</button>
           <p class="hint">Hints are stored against this session and must be requested in order.</p>
           <pre id="session-output">No session yet.</pre>
         </form>
@@ -122,6 +150,23 @@ print(greet("learner"))</textarea>
           <p class="hint">This development-only page stores the access token in local storage. Do not use this storage pattern for a production frontend.</p>
         </section>
       </section>
+      <div id="rocky" aria-live="polite">
+        <div id="rocky-bubble" class="rocky-bubble" hidden>
+          <p id="rocky-nudge-text"></p>
+          <span id="rocky-meta" class="rocky-meta"></span>
+          <div class="rocky-reply">
+            <input id="rocky-reply" type="text" placeholder="Talk back to Rocky…" autocomplete="off" />
+            <button type="button" id="rocky-ask">Send</button>
+          </div>
+          <div class="rocky-actions">
+            <button type="button" id="rocky-hint">Give me a hint</button>
+            <button type="button" id="rocky-agent-toggle" class="ghost">🤖 Agent mode: OFF</button>
+            <button type="button" id="rocky-helpful" class="secondary">Helpful</button>
+            <button type="button" id="rocky-dismiss" class="ghost">Dismiss</button>
+          </div>
+        </div>
+        <button type="button" id="rocky-character" aria-label="Rocky live tutor"><span class="rocky-avatar" aria-hidden="true">🐶</span><span class="rocky-name">Rocky</span></button>
+      </div>
     </main>
     <script>
       const $ = (id) => document.querySelector(`#${id}`);
@@ -131,9 +176,23 @@ print(greet("learner"))</textarea>
       const showMentor = (value) => {
         show(value);
         if (value?.personalization) $('personalization-output').textContent = JSON.stringify(value.personalization, null, 2);
+        if (value?.model && typeof setLLMStatus === 'function') setLLMStatus('ok', value.model);
+        if (value?.message && typeof showRockyMessage === 'function') showRockyMessage(value.message, value.level ? `hint · level ${value.level}` : `mentor · ${value.model || 'local model'}`);
       };
 
-      const showError = (error) => show(error?.detail || error);
+      const setLLMStatus = (state, detail = '') => {
+        const badge = $('llm-status');
+        if (!badge) return;
+        badge.classList.toggle('ok', state === 'ok');
+        badge.classList.toggle('unavailable', state === 'unavailable');
+        badge.textContent = state === 'ok' ? `LLM online · ${detail || 'ready'}` : 'LLM not connected';
+        badge.title = detail || (state === 'unavailable' ? 'Start Ollama or LM Studio.' : '');
+      };
+      const showError = (error) => {
+        const detail = error?.detail || error;
+        if (/AI provider|LLM|model/i.test(String(detail))) setLLMStatus('unavailable', String(detail));
+        show(detail);
+      };
       const request = async (path, options = {}) => {
         const headers = { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) };
         const response = await fetch(path, { ...options, headers });
@@ -195,32 +254,264 @@ print(greet("learner"))</textarea>
           show(await request('/execution/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, version, stdin: $('stdin').value }) }));
         } catch (error) { showError(error); }
       });
-      $('recommend').addEventListener('click', async () => {
+      if ($('recommend')) $('recommend').addEventListener('click', async () => {
         try {
           const recommendations = await request('/problems/recommended?k=5', { headers: authHeaders() });
-          $('recommendation-output').textContent = JSON.stringify(recommendations, null, 2);
+          if ($('recommendation-output')) $('recommendation-output').textContent = JSON.stringify(recommendations, null, 2);
           show(recommendations);
         } catch (error) { showError(error); }
       });
       $('chat').addEventListener('click', async () => {
         try {
           const sessionId = $('session-id').value || null;
-          show(await request('/mentor/chat', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, message: $('chat-message').value }) }));
+          showMentor(await request('/mentor/chat', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, message: $('chat-message').value }) }));
         } catch (error) { showError(error); }
       });
       $('explain').addEventListener('click', async () => {
-        try { show(await request('/mentor/explain-error', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: $('session-id').value || null, error: $('runtime-error').value }) })); } catch (error) { showError(error); }
+        try { showMentor(await request('/mentor/explain-error', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: $('session-id').value || null, error: $('runtime-error').value }) })); } catch (error) { showError(error); }
       });
+      async function requestProgressiveHint() {
+        const sessionId = await ensureSession();
+        const response = await request('/mentor/hint', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, request: 'Give me the next useful hint.' }) });
+        $('hint-level').textContent = `Completed level: ${response.level} · next: ${Math.min(response.level + 1, 5)}`;
+        $('hint-output').textContent = response.message;
+        showMentor(response);
+        return response;
+      }
       $('hint').addEventListener('click', async () => {
         try {
-          const sessionId = await ensureSession();
-          const response = await request('/mentor/hint', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, request: 'Give me the next useful hint.' }) });
-          $('hint-level').textContent = `Completed level: ${response.level} · next: ${Math.min(response.level + 1, 5)}`;
-          $('hint-output').textContent = response.message;
-          show(response);
+          await requestProgressiveHint();
         } catch (error) { showError(error); }
       });
-      request('/health').then(() => $('health').textContent = 'API online · Phase 5 & 6 ready').catch(() => $('health').textContent = 'API unavailable · start the backend first');
+
+      let liveModeActive = false;
+      let livePauseTimer = null;
+      let liveAbortController = null;
+      let rockyDragged = false;
+      const rocky = $('rocky');
+      const rockyCharacter = $('rocky-character');
+      const rockyBubble = $('rocky-bubble');
+      const rockyNudgeText = $('rocky-nudge-text');
+      const rockyMeta = $('rocky-meta');
+      const rockyReply = $('rocky-reply');
+      const rockyAgentToggle = $('rocky-agent-toggle');
+      const rockyConversation = [];
+      const setRockyState = (state) => {
+        rockyCharacter.classList.toggle('running', state === 'running');
+        rockyCharacter.classList.toggle('shake', state === 'error');
+      };
+      const hideRockyBubble = () => { rockyBubble.hidden = true; };
+      const showRockyMessage = (message, meta = 'mentor') => {
+        rockyNudgeText.textContent = message;
+        rockyNudgeText.classList.remove('rocky-dots');
+        rockyMeta.textContent = meta;
+        rockyBubble.classList.remove('thinking');
+        rockyBubble.hidden = false;
+      };
+      const showRockyBubble = (body) => {
+        showRockyMessage(body.nudge, `${body.nudge_type} · ${body.stage}`);
+      };
+      const instantRockyThought = () => {
+        const code = $('code').value.trim();
+        if (!code) return 'What is the first thing you want this program to do?';
+        if (/\b(for|while)\b/.test(code)) return 'What should this loop keep track of as it runs?';
+        if (/\b(return|print)\b/.test(code)) return 'What value should this line produce next?';
+        return 'What is the next small step you expect this code to take?';
+      };
+      const showRockyThinking = () => {
+        rockyNudgeText.textContent = '⋯';
+        rockyNudgeText.classList.add('rocky-dots');
+        rockyMeta.textContent = 'Rocky · looking at your code…';
+        rockyBubble.classList.add('thinking');
+        rockyBubble.hidden = false;
+      };
+      const syncAgentControls = () => {
+        const label = `🤖 Agent mode: ${liveModeActive ? 'ON' : 'OFF'}`;
+        rockyAgentToggle.textContent = label;
+        rockyAgentToggle.classList.toggle('agent-on', liveModeActive);
+        $('live-tutor-toggle').textContent = `🐾 Live Tutor: ${liveModeActive ? 'ON' : 'OFF'}`;
+        $('live-tutor-toggle').classList.toggle('live-on', liveModeActive);
+      };
+      const LIVE_PAUSE_MS = 400;
+      const LIVE_REQUEST_GAP_MS = 600;
+      let lastLiveRequestAt = 0;
+      let liveRequestStartedAt = 0;
+      const requestLiveNudge = async (signal = 'idle_800ms') => {
+        if (!liveModeActive) return;
+        const now = Date.now();
+        if (now - lastLiveRequestAt < LIVE_REQUEST_GAP_MS) return;
+        // Do not discard a fast in-flight response when another keystroke
+        // arrives. Only replace a request that has been running for >5s.
+        if (liveAbortController) {
+          if (now - liveRequestStartedAt <= 5_000) return;
+          liveAbortController.abort();
+        }
+        lastLiveRequestAt = now;
+        liveRequestStartedAt = now;
+        liveAbortController = new AbortController();
+        const controller = liveAbortController;
+        const timeout = setTimeout(() => controller.abort(), 20000);
+        showRockyThinking();
+        setRockyState('running');
+        try {
+          const sessionId = await ensureSession();
+          // Live Tutor may have been switched off while the session was being
+          // created. Never send the nudge request in that case.
+          if (!liveModeActive || controller.signal.aborted) return;
+          const body = await request('/mentor/live-nudge', {
+            method: 'POST',
+            headers: authHeaders(),
+            signal: controller.signal,
+            body: JSON.stringify({ ...codePayload(), session_id: sessionId, problem_id: null, client_detected_signal: `${signal}; typing_wpm=${estimateTypingSpeedWpm().toFixed(1)}` }),
+          });
+          if (controller !== liveAbortController) return;
+          setLLMStatus('ok', 'response received');
+          show(body);
+          if (body.nudge) showRockyBubble(body);
+          else if (body.should_display === false) rockyMeta.textContent = 'Rocky · watching…';
+          else rockyMeta.textContent = 'Rocky · waiting for a new step';
+          setRockyState('idle');
+        } catch (error) {
+          if (controller === liveAbortController) {
+            rockyMeta.textContent = error?.name === 'AbortError' ? 'Rocky · still watching' : 'Rocky · offline';
+            setRockyState('error');
+            setTimeout(() => setRockyState('idle'), 900);
+            if (error?.name !== 'AbortError') showError(error);
+          }
+        } finally {
+          clearTimeout(timeout);
+          if (controller === liveAbortController) {
+            liveAbortController = null;
+            liveRequestStartedAt = 0;
+          }
+        }
+      };
+      const onLiveToggle = (active) => {
+        liveModeActive = active;
+        if (!active) {
+          clearTimeout(livePauseTimer);
+          livePauseTimer = null;
+          liveAbortController?.abort();
+          liveAbortController = null;
+          setRockyState('idle');
+          if (!rockyBubble.hidden) showRockyMessage('Agent mode is off. Ask me anything or turn Agent mode back on for automatic guidance.', 'Rocky · manual mode');
+        }
+        rocky.dataset.liveActive = active ? 'true' : 'false';
+        syncAgentControls();
+      };
+      $('live-tutor-toggle').addEventListener('click', () => {
+        onLiveToggle(!liveModeActive);
+      });
+      rockyAgentToggle.addEventListener('click', () => onLiveToggle(!liveModeActive));
+      const keystrokeTimes = [];
+      document.addEventListener('keydown', () => {
+        const now = Date.now();
+        keystrokeTimes.push(now);
+        while (keystrokeTimes.length > 0 && now - keystrokeTimes[0] > 10000) keystrokeTimes.shift();
+      });
+      function estimateTypingSpeedWpm() {
+        if (keystrokeTimes.length < 2) return 0;
+        const span = (keystrokeTimes[keystrokeTimes.length - 1] - keystrokeTimes[0]) / 1000;
+        if (span <= 0) return 0;
+        return ((keystrokeTimes.length - 1) / span) * 12;
+      }
+      $('code').addEventListener('input', () => {
+        clearTimeout(livePauseTimer);
+        livePauseTimer = null;
+        if (!liveModeActive) return;
+        livePauseTimer = setTimeout(() => {
+          if (!liveModeActive) return;
+          requestLiveNudge($('code').value.trim() ? 'idle_800ms' : 'empty_file');
+        }, LIVE_PAUSE_MS);
+      });
+      $('rocky-hint').addEventListener('click', async () => {
+        try { await requestProgressiveHint(); } catch (error) { showError(error); }
+      });
+      const askRocky = async () => {
+        const message = rockyReply.value.trim();
+        if (!message) return;
+        const history = rockyConversation.slice(-6).map((turn) => `${turn.role}: ${turn.content}`).join('\n');
+        const prompt = history ? `${history}\nlearner: ${message}` : message;
+        rockyReply.disabled = true;
+        try {
+          const sessionId = $('session-id').value || null;
+          const response = await request('/mentor/chat', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ ...codePayload(), session_id: sessionId, message: prompt }),
+          });
+          rockyConversation.push({ role: 'learner', content: message });
+          rockyConversation.push({ role: 'mentor', content: response.message });
+          rockyReply.value = '';
+          showMentor(response);
+        } catch (error) {
+          showError(error);
+          showRockyMessage(error?.detail || 'I could not reach the mentor model.', 'Rocky · offline');
+        } finally {
+          rockyReply.disabled = false;
+          rockyReply.focus();
+        }
+      };
+      $('rocky-ask').addEventListener('click', askRocky);
+      rockyReply.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          askRocky();
+        }
+      });
+      $('rocky-helpful').addEventListener('click', async () => {
+        try {
+          await request('/mentor/live-nudge/feedback', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ session_id: $('session-id').value, helpful: true }) });
+          hideRockyBubble();
+        } catch (error) { showError(error); }
+      });
+      $('rocky-dismiss').addEventListener('click', async () => {
+        try {
+          await request('/mentor/live-nudge/feedback', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ session_id: $('session-id').value, helpful: false }) });
+          hideRockyBubble();
+        } catch (error) { showError(error); }
+      });
+      rockyCharacter.addEventListener('pointerdown', (event) => {
+        rockyDragged = false;
+        const rect = rocky.getBoundingClientRect();
+        const offsetX = event.clientX - rect.left;
+        const offsetY = event.clientY - rect.top;
+        rockyCharacter.setPointerCapture(event.pointerId);
+        const move = (moveEvent) => {
+          if (Math.abs(moveEvent.clientX - event.clientX) > 4 || Math.abs(moveEvent.clientY - event.clientY) > 4) rockyDragged = true;
+          if (!rockyDragged) return;
+          rocky.style.left = `${Math.max(8, Math.min(window.innerWidth - rect.width - 8, moveEvent.clientX - offsetX))}px`;
+          rocky.style.top = `${Math.max(8, Math.min(window.innerHeight - rect.height - 8, moveEvent.clientY - offsetY))}px`;
+          rocky.style.right = 'auto';
+          rocky.style.bottom = 'auto';
+        };
+        const up = () => {
+          rockyCharacter.removeEventListener('pointermove', move);
+          rockyCharacter.removeEventListener('pointerup', up);
+        };
+        rockyCharacter.addEventListener('pointermove', move);
+        rockyCharacter.addEventListener('pointerup', up, { once: true });
+      });
+      rockyCharacter.addEventListener('click', () => {
+        if (rockyDragged || !rockyBubble.hidden) return;
+        if (liveModeActive) requestLiveNudge('manual_pause');
+        else showRockyMessage('I am ready. Turn on Agent mode for automatic guidance while you type, or ask me a question here.', 'Rocky · manual mode');
+      });
+      const checkLLMStatus = async () => {
+        try {
+          const body = await request('/health/llm');
+          if (body.status === 'ok') setLLMStatus('ok', `${body.provider} · ${body.model}`);
+          else setLLMStatus('unavailable', body.detail || 'No provider is reachable.');
+        } catch (error) {
+          setLLMStatus('unavailable', error?.detail || 'The API is unavailable.');
+        }
+      };
+      request('/health').then(() => $('health').textContent = 'API online · Phase 5 & 6 ready').catch(() => {
+        $('health').textContent = 'API unavailable · start the backend first';
+        setLLMStatus('unavailable', 'Start the backend first.');
+      });
+      checkLLMStatus();
+      setInterval(checkLLMStatus, 15000);
       if (token()) $('auth-state').textContent = 'An access token is already stored in this browser.';
     </script>
   </body>

@@ -163,6 +163,8 @@ Leave `LMSTUDIO_MODEL` empty to automatically use the first model returned by
 | `POST /mentor/chat` | Ask a Socratic mentor question |
 | `POST /mentor/hint` | Request the next progressive hint |
 | `POST /mentor/explain-error` | Explain a runtime or compiler error |
+| `POST /mentor/live-nudge` | Request a short, stage-aware Live Tutor nudge |
+| `POST /mentor/live-nudge/feedback` | Mark a Live Tutor nudge helpful or dismiss it |
 | `GET /users/me/profile` | Read the learner's adaptive profile |
 | `GET /problems/recommended` | Retrieve personalized stub-problem recommendations |
 
@@ -172,6 +174,11 @@ Starting a session automatically creates a default profile for the authenticated
 the session schedules a non-blocking profile update using execution and hint history. The profile
 controls mentor teaching style, hint-depth ceiling, difficulty adjustment, and intervention
 frequency. Mentor chat, hints, and error explanations include this adaptation context automatically.
+
+Live Tutor uses the same profile fast path. It rate-limits calls per user/session, suppresses
+repeated stages, and records displayed nudges as `HintEvent.source="nudge"`. The `/demo/` page
+includes Rocky: enable **Live Tutor**, pause while editing, and use the bubble's **Give me a hint**
+button to reuse the normal progressive-hint flow.
 
 Inspect the current profile with:
 
