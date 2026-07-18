@@ -4,6 +4,20 @@ Backend-only FastAPI service for an adaptive coding mentor. It includes JWT auth
 workspaces, Piston execution, Ruff/ESLint static analysis, local-model mentor chat, progressive
 hints, and a browser demo UI.
 
+## Current Status (Hackathon Progress)
+The core adaptive engine is **complete and fully integrated**. Key milestones achieved:
+- **Learner Profiles**: Automatically adapt (e.g., `socratic` vs `scaffolded`) based on execution history (fail ratios, hint usage).
+- **Personalized Recommendations**: A custom bi-encoder ML model recommends problems matching the learner's dynamic difficulty level.
+- **Contextual Mentor Chat**: Responses from the local LLM (Ollama or LM Studio) are dynamically steered by injecting the learner's active profile into the context.
+- **End-to-End Validation**: The `demo_personalization.py` script successfully simulates learner archetypes, forces profile divergence via background tasks, and verifies that the LLM output and recommendations adapt accordingly.
+
+## Current Status (Hackathon Progress)
+The core adaptive engine is **complete and fully integrated**. Key milestones achieved:
+- **Learner Profiles**: Automatically adapt (e.g., `socratic` vs `scaffolded`) based on execution history (fail ratios, hint usage).
+- **Personalized Recommendations**: A custom bi-encoder ML model recommends problems matching the learner's dynamic difficulty level.
+- **Contextual Mentor Chat**: Responses from the local LLM (Ollama or LM Studio) are dynamically steered by injecting the learner's active profile into the context.
+- **End-to-End Validation**: The `demo_personalization.py` script successfully simulates learner archetypes, forces profile divergence via background tasks, and verifies that the LLM output and recommendations adapt accordingly.
+
 ## Requirements
 
 - Python 3.12+
