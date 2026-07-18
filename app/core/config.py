@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class LLMProvider(StrEnum):
+    AUTO = "auto"
     OLLAMA = "ollama"
     OPENAI = "openai"
     GROQ = "groq"
@@ -29,13 +30,17 @@ class Settings(BaseSettings):
     piston_base_url: str = "http://localhost:2000"
     piston_request_timeout_seconds: float = Field(default=15, gt=0, le=60)
     static_analysis_timeout_seconds: float = Field(default=5, gt=0, le=30)
-    llm_request_timeout_seconds: float = Field(default=30, gt=0, le=120)
+    # A single provider attempt is bounded so an unavailable local server can
+    # fall through to the next configured provider instead of hanging requests.
+    llm_request_timeout_seconds: float = Field(default=60, gt=0, le=300)
     recommendation_artifact_dir: str = "artifacts/recommender"
 
     llm_provider: LLMProvider = LLMProvider.OLLAMA
     ollama_base_url: str = "http://localhost:11434/v1"
     ollama_api_key: str = "ollama"
     ollama_model: str = "qwen3:8b"
+    ollama_think: bool = False
+    ollama_num_predict: int = Field(default=512, gt=0, le=4096)
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
     groq_api_key: str | None = None
@@ -44,7 +49,8 @@ class Settings(BaseSettings):
     hf_model: str = "meta-llama/Llama-3.3-70B-Instruct"
     lmstudio_base_url: str = "http://localhost:1234/v1"
     lmstudio_api_key: str = "lm-studio"
-    lmstudio_model: str = "local-model"
+    # Empty means "use the first model returned by LM Studio /v1/models".
+    lmstudio_model: str = ""
 
     google_client_id: str | None = None
     google_client_secret: str | None = None

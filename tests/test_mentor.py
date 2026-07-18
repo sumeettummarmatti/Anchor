@@ -1,8 +1,10 @@
+from types import SimpleNamespace
+
 import pytest
 from httpx import AsyncClient
 
 from app.core.config import LLMProvider, Settings
-from app.core.exceptions import ConfigurationError
+from app.core.exceptions import AIProviderError, ConfigurationError
 from app.services.ai_service import AIService, PromptContext
 from tests.test_projects import token_for
 
@@ -35,6 +37,60 @@ async def test_remote_provider_without_a_key_is_rejected() -> None:
     context = PromptContext("chat", "python", "print(1)", "Help me understand this.")
     with pytest.raises(ConfigurationError):
         await AIService(settings).complete(context)
+
+
+async def test_lmstudio_discovers_first_loaded_model() -> None:
+    settings = Settings(_env_file=None, llm_provider=LLMProvider.LMSTUDIO, lmstudio_model="")
+    service = AIService(settings)
+
+    class Models:
+        async def list(self) -> SimpleNamespace:
+            return SimpleNamespace(data=[SimpleNamespace(id="loaded-model")])
+
+    client = SimpleNamespace(models=Models())
+    connection = service.connection(LLMProvider.LMSTUDIO)
+    assert await service._resolve_model(connection, client) == "loaded-model"
+
+
+async def test_ollama_timeout_falls_back_to_lmstudio(monkeypatch) -> None:
+    settings = Settings(
+        _env_file=None,
+        llm_provider=LLMProvider.OLLAMA,
+        ollama_model="qwen3:8b",
+        lmstudio_model="",
+    )
+    service = AIService(settings)
+
+    class Completions:
+        def __init__(self, provider: LLMProvider) -> None:
+            self.provider = provider
+
+        async def create(self, **kwargs):
+            if self.provider is LLMProvider.OLLAMA:
+                raise AIProviderError("simulated Ollama timeout")
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="LM Studio response"))]
+            )
+
+    clients = {
+        provider: SimpleNamespace(
+            chat=SimpleNamespace(completions=Completions(provider)),
+        )
+        for provider in (LLMProvider.OLLAMA, LLMProvider.LMSTUDIO)
+    }
+
+    def fake_client_for(connection, provider):
+        return clients[provider]
+
+    async def fake_resolve_model(connection, client):
+        return connection.model or "loaded-model"
+
+    monkeypatch.setattr(service, "_client_for", fake_client_for)
+    monkeypatch.setattr(service, "_resolve_model", fake_resolve_model)
+    context = PromptContext("chat", "python", "print(1)", "Explain this.")
+    response, model = await service.complete(context)
+    assert response == "LM Studio response"
+    assert model == "loaded-model"
 
 
 async def test_hint_progression_is_persisted_and_cannot_be_skipped(

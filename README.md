@@ -1,7 +1,7 @@
 # AI Coding Mentor API
 
 Backend-only FastAPI service for an adaptive coding mentor. It includes JWT auth, project/session
-workspaces, Piston execution, Ruff/ESLint static analysis, Ollama-backed mentor chat, progressive
+workspaces, Piston execution, Ruff/ESLint static analysis, local-model mentor chat, progressive
 hints, and a browser demo UI.
 
 ## Requirements
@@ -9,9 +9,11 @@ hints, and a browser demo UI.
 - Python 3.12+
 - [`uv`](https://docs.astral.sh/uv/)
 - Docker Desktop with Docker Compose
-- [Ollama](https://ollama.com/download) with the `qwen3:8b` model
+- [Ollama](https://ollama.com/download) with the `qwen3:8b` model, or [LM Studio](https://lmstudio.ai/)
+  with any model loaded in its local server
 
-The default LLM is local Ollama. No OpenAI key is required for the default setup.
+The default LLM is local Ollama. If Ollama is unavailable or times out, the API automatically
+tries LM Studio. No OpenAI key is required for either local provider.
 
 ## Fresh setup on macOS
 
@@ -119,15 +121,25 @@ uv run pytest tests/test_mentor.py -q
 uv run pytest tests/test_personalization.py -q
 ```
 
-The mentor unit tests mock the LLM provider. The running application uses Ollama through the
-OpenAI-compatible endpoint configured in `.env`:
+The mentor unit tests mock the LLM provider. The running application uses Ollama first and falls
+back to LM Studio through OpenAI-compatible endpoints:
 
 ```dotenv
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434/v1
 OLLAMA_API_KEY=ollama
 OLLAMA_MODEL=qwen3:8b
+OLLAMA_THINK=false
+OLLAMA_NUM_PREDICT=512
+LLM_REQUEST_TIMEOUT_SECONDS=60
+LMSTUDIO_BASE_URL=http://localhost:1234/v1
+LMSTUDIO_API_KEY=lm-studio
+LMSTUDIO_MODEL=
 ```
+
+Leave `LMSTUDIO_MODEL` empty to automatically use the first model returned by
+`http://localhost:1234/v1/models`. Set `LLM_PROVIDER=lmstudio` to use LM Studio only, or
+`LLM_PROVIDER=auto` to explicitly enable the Ollama-then-LM Studio order.
 
 ## API endpoints
 
@@ -191,7 +203,11 @@ the token after using the **Authorize** button.
 ## Configuration
 
 The committed `.env.example` documents all settings. Copy it to `.env`; never commit `.env` or
-API keys. Supported LLM providers are Ollama (default), OpenAI, Groq, Hugging Face, and LM Studio.
+API keys. Supported LLM providers are Ollama (default with LM Studio fallback), LM Studio, OpenAI,
+Groq, and Hugging Face. Local providers use one bounded request with no hidden SDK retries, so a
+failed Ollama request can fall through promptly. Start LM Studio's local server with its
+OpenAI-compatible API enabled; the loaded model is discovered automatically when
+`LMSTUDIO_MODEL` is blank.
 
 ## Troubleshooting
 

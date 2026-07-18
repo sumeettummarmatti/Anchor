@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 import httpx
@@ -70,8 +71,13 @@ class AIService:
         self.settings = settings
         self._client = client
 
-    def connection(self) -> LLMConnection:
-        match self.settings.llm_provider:
+    def connection(self, provider: LLMProvider | None = None) -> LLMConnection:
+        provider = provider or self.settings.llm_provider
+        match provider:
+            case LLMProvider.AUTO:
+                raise AIProviderError(
+                    "The automatic provider selector is not a concrete connection."
+                )
             case LLMProvider.OLLAMA:
                 return LLMConnection(
                     LLMProvider.OLLAMA,
@@ -109,6 +115,43 @@ class AIService:
                 )
         raise AIProviderError("Unsupported LLM provider.")
 
+    def provider_order(self) -> tuple[LLMProvider, ...]:
+        """Return providers to try, with local fallback for Ollama/auto."""
+        configured = self.settings.llm_provider
+        if configured is LLMProvider.AUTO:
+            return (LLMProvider.OLLAMA, LLMProvider.LMSTUDIO)
+        if configured is LLMProvider.OLLAMA:
+            return (LLMProvider.OLLAMA, LLMProvider.LMSTUDIO)
+        return (configured,)
+
+    def _client_for(self, connection: LLMConnection, provider: LLMProvider) -> AsyncOpenAI:
+        if self._client is not None and provider is self.settings.llm_provider:
+            return self._client
+        return AsyncOpenAI(
+            api_key=connection.api_key or "local",
+            base_url=connection.base_url,
+            timeout=httpx.Timeout(self.settings.llm_request_timeout_seconds, connect=5.0),
+            # The service owns fallback/retry behavior. The SDK must not repeat
+            # a slow local request behind our back.
+            max_retries=0,
+        )
+
+    async def _resolve_model(self, connection: LLMConnection, client: AsyncOpenAI) -> str:
+        """Resolve a local model dynamically when its configured name is blank."""
+        if connection.model and connection.model != "local-model":
+            return connection.model
+        try:
+            models = await client.models.list()
+        except (APITimeoutError, APIConnectionError, OpenAIError) as exc:
+            raise AIProviderError(
+                f"Could not discover a loaded {connection.provider.value} model."
+            ) from exc
+        ids: Iterable[str] = (item.id for item in models.data if getattr(item, "id", None))
+        model = next(iter(ids), None)
+        if not model:
+            raise AIProviderError(f"No loaded model was found in {connection.provider.value}.")
+        return model
+
     async def complete(self, context: PromptContext) -> tuple[str, str]:
         """Generate a response. Callers may supply context, never raw prompt strings."""
         from app.prompt_templates import explain_error, mentor_chat, mentor_hint
@@ -122,26 +165,46 @@ class AIService:
             builder = builders[context.intent]
         except KeyError as exc:
             raise AIProviderError("Unsupported mentor request.") from exc
-        connection = self.connection()
-        if not connection.api_key:
-            raise ConfigurationError(f"{connection.provider.value} is not configured.")
-        client = self._client or AsyncOpenAI(
-            api_key=connection.api_key,
-            base_url=connection.base_url,
-            timeout=httpx.Timeout(self.settings.llm_request_timeout_seconds),
-            max_retries=2,
-        )
         system, user = builder(context)
-        try:
-            completion = await client.chat.completions.create(
-                model=connection.model,
-                messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            )
-        except (APITimeoutError, APIConnectionError) as exc:
-            raise AIProviderError("The AI provider timed out or could not be reached.") from exc
-        except OpenAIError as exc:
-            raise AIProviderError() from exc
-        content = completion.choices[0].message.content if completion.choices else None
-        if not content:
-            raise AIProviderError("The AI provider returned an empty response.")
-        return content, connection.model
+        failures: list[str] = []
+        for provider in self.provider_order():
+            connection = self.connection(provider)
+            if not connection.api_key:
+                if len(self.provider_order()) == 1:
+                    raise ConfigurationError(f"{connection.provider.value} is not configured.")
+                failures.append(f"{provider.value}: not configured")
+                continue
+            client = self._client_for(connection, provider)
+            try:
+                model = await self._resolve_model(connection, client)
+                request = {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                }
+                if provider is LLMProvider.OLLAMA:
+                    # Qwen's reasoning mode can be very slow locally. Keep it
+                    # disabled by default and cap generated tokens.
+                    request["extra_body"] = {
+                        "think": self.settings.ollama_think,
+                        "options": {"num_predict": self.settings.ollama_num_predict},
+                    }
+                completion = await client.chat.completions.create(**request)
+                content = completion.choices[0].message.content if completion.choices else None
+                if not content:
+                    raise AIProviderError("The AI provider returned an empty response.")
+                return content, model
+            except (APITimeoutError, APIConnectionError):
+                failures.append(f"{provider.value}: timed out or unreachable")
+                continue
+            except OpenAIError:
+                failures.append(f"{provider.value}: request failed")
+                continue
+            except AIProviderError as exc:
+                failures.append(f"{provider.value}: {exc.detail}")
+                continue
+
+        detail = "AI providers unavailable. " + "; ".join(failures)
+        raise AIProviderError(detail)
