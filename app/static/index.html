@@ -169,7 +169,7 @@ print(greet("learner"))</textarea>
           <div class="rocky-actions">
             <button type="button" id="rocky-hint">Give me a hint</button>
             <button type="button" id="rocky-agent-toggle" class="ghost">🤖 Agent mode: OFF</button>
-            <button type="button" id="rocky-helpful" class="secondary">Helpful</button>
+            <button type="button" id="rocky-visualise" class="secondary">Visualise</button>
             <button type="button" id="rocky-dismiss" class="ghost">Dismiss</button>
           </div>
         </div>
@@ -480,11 +480,8 @@ print(greet("learner"))</textarea>
           askRocky();
         }
       });
-      $('rocky-helpful').addEventListener('click', async () => {
-        try {
-          await request('/mentor/live-nudge/feedback', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ session_id: $('session-id').value, helpful: true }) });
-          hideRockyBubble();
-        } catch (error) { showError(error); }
+      $('rocky-visualise').addEventListener('click', () => {
+        window.parent.postMessage({ type: 'mentor-visualise', code: $('code').value }, window.location.origin);
       });
       $('rocky-dismiss').addEventListener('click', async () => {
         try {

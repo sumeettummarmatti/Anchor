@@ -34,7 +34,7 @@
     </header>
     <main>
       <section class="panel active" id="mentor-panel" role="tabpanel" aria-labelledby="mentor-tab"><iframe id="mentor-frame" title="Coding Mentor" src="/demo/"></iframe></section>
-      <section class="panel" id="execution-panel" role="tabpanel" aria-labelledby="execution-tab"><iframe title="Execution Lab" src="/?view=lab&merged=1"></iframe></section>
+      <section class="panel" id="execution-panel" role="tabpanel" aria-labelledby="execution-tab"><iframe id="execution-frame" title="Execution Lab" src="/?view=lab&merged=1"></iframe></section>
       <section class="panel" id="interview-panel" role="tabpanel" aria-labelledby="interview-tab"><iframe title="Interview Engine" src="/?view=interview&merged=1"></iframe></section>
     </main>
     <script>
@@ -42,10 +42,12 @@
       if (!accessToken) location.replace('/merged/');
       const tabs = [...document.querySelectorAll('[role="tab"]')];
       const panels = [...document.querySelectorAll('[role="tabpanel"]')];
-      tabs.forEach((tab) => tab.addEventListener('click', () => {
+      let pendingExecutionCode = null;
+      const selectTab = (tab) => {
         tabs.forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
         panels.forEach((panel) => panel.classList.toggle('active', panel.id === tab.getAttribute('aria-controls')));
-      }));
+      };
+      tabs.forEach((tab) => tab.addEventListener('click', () => selectTab(tab)));
       document.getElementById('logout').addEventListener('click', () => {
         localStorage.removeItem('mentor_access_token');
         localStorage.removeItem('mentor_workspace_session_id');
@@ -108,6 +110,23 @@
       };
       document.getElementById('mentor-frame').addEventListener('load', () => {
         prepareMentor().catch((error) => console.error('Unable to prepare learning session', error));
+      });
+      const copyCodeToExecutionLab = () => {
+        if (pendingExecutionCode === null) return;
+        const executionDocument = document.getElementById('execution-frame').contentDocument;
+        const sourceCode = executionDocument?.getElementById('source-code');
+        if (!sourceCode) return;
+        sourceCode.value = pendingExecutionCode;
+        sourceCode.dispatchEvent(new Event('input', { bubbles: true }));
+        pendingExecutionCode = null;
+      };
+      document.getElementById('execution-frame').addEventListener('load', copyCodeToExecutionLab);
+      window.addEventListener('message', (event) => {
+        if (event.origin !== window.location.origin || event.source !== document.getElementById('mentor-frame').contentWindow) return;
+        if (event.data?.type !== 'mentor-visualise' || typeof event.data.code !== 'string') return;
+        pendingExecutionCode = event.data.code;
+        copyCodeToExecutionLab();
+        selectTab(document.getElementById('execution-tab'));
       });
     </script>
   </body>
