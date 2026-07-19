@@ -28,3 +28,9 @@ class SessionResponse(BaseModel):
     started_at: datetime
     ended_at: datetime | None
     event_count: int
+
+
+class StuckScoreResponse(BaseModel):
+    score: float
+    is_stuck: bool
+    signals: dict[str, float]

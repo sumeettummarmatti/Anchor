@@ -59,10 +59,18 @@
       .rocky-reply button { flex: 0 0 auto; margin: 0; }
       @keyframes rocky-bob { from { transform: translateY(0); } to { transform: translateY(-6px); } }
       @keyframes rocky-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+      .stuck-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 10001; background: #55d686; color: #071126; padding: 12px 24px; display: flex; justify-content: center; gap: 16px; align-items: center; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+      .stuck-banner button { margin: 0; background: #071126; color: #55d686; padding: 6px 12px; font-weight: 800; border: none; border-radius: 6px; cursor: pointer; }
+      .stuck-banner[hidden] { display: none; }
       @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } .wide { grid-column: auto; } .row { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
+    <div id="stuck-banner" class="stuck-banner" hidden>
+      <span>Are you stuck? Let Rocky help you!</span>
+      <button type="button" onclick="document.getElementById('rocky-character').click(); document.getElementById('stuck-banner').hidden = true;">Click on Rocky and communicate</button>
+      <button type="button" class="ghost" style="border: 1px solid #071126; background: transparent; color: #071126;" onclick="document.getElementById('stuck-banner').hidden = true;">Dismiss</button>
+    </div>
     <div id="llm-status" class="llm-status" role="status" aria-live="polite">LLM: checking…</div>
     <main>
       <div class="eyebrow">Local API demo · phases 5 & 6</div>
@@ -247,11 +255,24 @@ print(greet("learner"))</textarea>
       $('analyze').addEventListener('click', async () => {
         try { show(await request('/static-analysis/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify(codePayload()) })); } catch (error) { showError(error); }
       });
+      const checkStuckScore = async (sessionId) => {
+        if (!sessionId) return;
+        try {
+          const score = await request(`/sessions/${sessionId}/stuck-score`, { headers: authHeaders() });
+          if (score.is_stuck) {
+            $('stuck-banner').hidden = false;
+          }
+        } catch (e) {
+          // gracefully ignore
+        }
+      };
+
       $('run').addEventListener('click', async () => {
         try {
           const sessionId = await ensureSession();
           const version = $('language').value === 'python' ? '3.10.0' : '18.15.0';
           show(await request('/execution/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, version, stdin: $('stdin').value }) }));
+          await checkStuckScore(sessionId);
         } catch (error) { showError(error); }
       });
       if ($('recommend')) $('recommend').addEventListener('click', async () => {

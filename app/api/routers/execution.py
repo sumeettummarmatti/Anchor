@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -7,6 +7,7 @@ from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.execution import ExecutionRequest, ExecutionResult
 from app.services.execution_service import ExecutionService
+from app.services.stuck_detection_service import check_stuck_score
 
 router = APIRouter(prefix="/execution", tags=["execution"])
 
@@ -14,6 +15,7 @@ router = APIRouter(prefix="/execution", tags=["execution"])
 @router.post("/run", response_model=ExecutionResult)
 async def run_code(
     payload: ExecutionRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
@@ -21,6 +23,7 @@ async def run_code(
     execution, execution_time_ms, analysis = await ExecutionService(session, settings).run(
         current_user.id, payload
     )
+    background_tasks.add_task(check_stuck_score, payload.session_id)
     return ExecutionResult(
         id=execution.id,
         stdout=execution.stdout,

@@ -322,3 +322,30 @@
 - `uv run pytest -q` (33 passed)
 - `uv run alembic upgrade head` and `uv run alembic current` (`20260718_0007 (head)`)
 - Browser script syntax check with Node (`frontend script syntax: ok`)
+## 2026-07-19 14:00
+
+### Completed
+- Implemented Phase 8 (Stuck Detection Service) as a pure synchronous function without any DB or Redis dependency inside the calculation logic.
+- Wired the stuck check directly into `GET /sessions/{id}/stuck-score` and background tasks post-event and post-execution.
+- Wired Rocky's bubble checking into `app/static/index.html` after an execution response to display "Hey, are you stuck? Want some help?"
+- Enforced live-nudge's existing dismissal lock per-session so Rocky respects user suppression, ensuring this stuck check is additive to live-nudge, not a replacement.
+
+### Files Added
+- `tests/test_stuck_detection_service.py`
+
+### Files Modified
+- `app/services/stuck_detection_service.py`
+- `app/api/routers/sessions.py`
+- `app/api/routers/execution.py`
+- `app/schemas/sessions.py`
+- `app/static/index.html`
+
+### Decisions
+- Reused `live_nudge_state.should_suppress_pretrigger` to instantly zero out stuck scores if Rocky is dismissed, maintaining a single unified dismissal lock.
+- Keep the pure logic completely decoupled by passing exactly the lists needed.
+
+### Known Limitations
+- The background tasks `check_stuck_score` currently evaluate the score but do not actively push the state to the frontend, relying on the frontend explicitly polling `GET /stuck-score` after runs.
+
+### TODO / Next Recommended Step
+- Review Phase 8 and confirm if Rocky's logic fulfills the real-time requirements or if we need websocket push signals for background task updates.
