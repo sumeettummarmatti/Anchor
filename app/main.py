@@ -4,10 +4,12 @@ from uuid import uuid4
 
 import structlog
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+
+from interview_engine.app.main import app as interview_engine_app
 
 from app.api.routers.auth import router as auth_router
 from app.api.routers.execution import router as execution_router
@@ -56,6 +58,18 @@ app.include_router(execution_router)
 app.include_router(static_analysis_router)
 app.include_router(mentor_router)
 app.mount("/demo", StaticFiles(directory="app/static", html=True), name="demo")
+app.mount("/merged", StaticFiles(directory="app/merged_static", html=True), name="merged")
+
+
+@app.get("/merged", include_in_schema=False)
+async def merged_login_page() -> FileResponse:
+    return FileResponse("app/merged_static/index.html")
+
+
+# The interview engine keeps its original root-relative frontend API paths.
+# Mounting it last preserves every existing Mentor Lab route while exposing the
+# recovered engine UI and APIs unchanged for the merged workspace.
+app.mount("/", interview_engine_app, name="interview-engine")
 
 
 @app.exception_handler(AppError)

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mentor Workspace</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      * { box-sizing: border-box; }
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; color: #edf3ff; background: radial-gradient(circle at 14% 8%, #263f70, transparent 34%), #08101e; }
+      main { width: min(460px, calc(100% - 32px)); padding: 32px; border: 1px solid #2b4167; border-radius: 20px; background: rgba(15, 27, 48, .94); box-shadow: 0 22px 60px rgba(0, 0, 0, .34); }
+      .eyebrow { color: #8bb5ff; font-size: .75rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+      h1 { margin: .35rem 0 .7rem; font-size: clamp(2rem, 8vw, 3rem); letter-spacing: -.055em; }
+      p { color: #b7c6e0; line-height: 1.5; }
+      label { display: block; margin: 14px 0 6px; color: #b9c6df; font-size: .82rem; }
+      input { width: 100%; padding: 11px 12px; border: 1px solid #3a527e; border-radius: 9px; background: #091426; color: #fff; font: inherit; }
+      .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
+      button { border: 0; border-radius: 9px; padding: 11px 14px; background: #76a5ff; color: #071126; font: inherit; font-weight: 800; cursor: pointer; }
+      button.secondary { background: #293e62; color: #dce7ff; }
+      button:disabled { opacity: .65; cursor: wait; }
+      #status { min-height: 1.4em; margin: 15px 0 0; font-size: .84rem; }
+      #status.error { color: #ffb2b2; }
+      .note { font-size: .78rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">Unified learning workspace</div>
+      <h1>Welcome back.</h1>
+      <p>Create an account or sign in to open your coding mentor and interview engine in one place.</p>
+      <form id="auth-form">
+        <label for="display-name">Display name <span>(sign-up only)</span></label>
+        <input id="display-name" value="Ada Learner" autocomplete="name" />
+        <label for="email">Email</label>
+        <input id="email" type="email" required autocomplete="email" placeholder="ada@example.com" />
+        <label for="password">Password</label>
+        <input id="password" type="password" required minlength="8" autocomplete="current-password" />
+        <div class="actions">
+          <button type="button" id="signup">Create account</button>
+          <button type="submit" class="secondary">Log in</button>
+        </div>
+      </form>
+      <p id="status" aria-live="polite"></p>
+      <p class="note">Your session is stored locally for this development demo.</p>
+    </main>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const status = $('status');
+      const setStatus = (message, error = false) => { status.textContent = message; status.classList.toggle('error', error); };
+      const request = async (path, body) => {
+        const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const payload = await response.json();
+        if (!response.ok) throw payload;
+        return payload;
+      };
+      const credentials = () => ({ email: $('email').value, password: $('password').value });
+      const createLearningSession = async (accessToken) => {
+        const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` };
+        const projectResponse = await fetch('/projects', {
+          method: 'POST', headers,
+          body: JSON.stringify({ name: 'Merged workspace scratch', language: 'python' }),
+        });
+        const project = await projectResponse.json();
+        if (!projectResponse.ok) throw project;
+        const sessionResponse = await fetch('/sessions', {
+          method: 'POST', headers,
+          body: JSON.stringify({ project_id: project.id }),
+        });
+        const session = await sessionResponse.json();
+        if (!sessionResponse.ok) throw session;
+        localStorage.setItem('mentor_workspace_session_id', session.id);
+      };
+      const goToWorkspace = async (tokens) => {
+        localStorage.setItem('mentor_access_token', tokens.access_token);
+        localStorage.removeItem('mentor_workspace_session_id');
+        setStatus('Preparing your learning session…');
+        await createLearningSession(tokens.access_token);
+        location.assign('/merged/workspace/');
+      };
+      $('signup').addEventListener('click', async () => {
+        const button = $('signup'); button.disabled = true; setStatus('Creating your account…');
+        try {
+          await request('/auth/register', { ...credentials(), display_name: $('display-name').value });
+          const tokens = await request('/auth/login', credentials());
+          await goToWorkspace(tokens);
+        } catch (error) { setStatus(error?.detail || 'Unable to create the account.', true); }
+        finally { button.disabled = false; }
+      });
+      $('auth-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = event.submitter; button.disabled = true; setStatus('Signing you in…');
+        try { await goToWorkspace(await request('/auth/login', credentials())); }
+        catch (error) { setStatus(error?.detail || 'Unable to sign in.', true); }
+        finally { button.disabled = false; }
+      });
+      if (localStorage.getItem('mentor_access_token')) location.replace('/merged/workspace/');
+    </script>
+  </body>
+</html>

@@ -1,0 +1,1 @@
+{"LINE_EXECUTED": "A source line executed", "FUNCTION_CALL": "A function frame was entered", "FUNCTION_RETURN": "A function frame returned", "EXCEPTION": "Execution raised an exception", "STDOUT": "The program wrote output"}

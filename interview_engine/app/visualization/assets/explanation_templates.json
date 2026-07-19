@@ -1,0 +1,1 @@
+{"assignment": "This statement updates program state by assigning a value to a variable.", "loop": "This line controls loop execution and determines whether another iteration runs.", "exception": "Execution raised an exception at this point. Inspect the current variables and call stack."}

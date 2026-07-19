@@ -1,0 +1,19 @@
+{
+  "INTERVIEW_STARTED": "A technical interview was started.",
+  "INTERVIEW_COMPLETED": "A technical interview was completed.",
+  "QUESTION_ANSWERED": "An interview question was answered.",
+  "TRACE_CREATED": "An execution trace was created.",
+  "TRACE_COMPLETED": "An execution trace was completed.",
+  "EXECUTION_STARTED": "A code execution started.",
+  "EXECUTION_COMPLETED": "A code execution completed.",
+  "HINT_REQUESTED": "A learner requested a hint.",
+  "CHAT_STARTED": "A mentor chat was started.",
+  "ERROR_EXPLAINED": "An error explanation was requested.",
+  "PROJECT_CREATED": "A project was created.",
+  "FILE_CREATED": "A file was created.",
+  "FILE_UPDATED": "A file was updated.",
+  "SESSION_STARTED": "A learning session was started.",
+  "SESSION_ENDED": "A learning session ended.",
+  "PROBLEM_STARTED": "A problem was started.",
+  "PROBLEM_SOLVED": "A problem was solved."
+}
