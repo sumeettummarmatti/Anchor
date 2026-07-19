@@ -27,13 +27,15 @@
       <div class="brand">Mentor <span>Workspace</span></div>
       <nav role="tablist" aria-label="Workspace experiences">
         <button type="button" role="tab" id="mentor-tab" aria-controls="mentor-panel" aria-selected="true">Coding Mentor</button>
+        <button type="button" role="tab" id="execution-tab" aria-controls="execution-panel" aria-selected="false">Execution Lab</button>
         <button type="button" role="tab" id="interview-tab" aria-controls="interview-panel" aria-selected="false">Interview Engine</button>
       </nav>
       <button type="button" class="logout" id="logout">Log out</button>
     </header>
     <main>
       <section class="panel active" id="mentor-panel" role="tabpanel" aria-labelledby="mentor-tab"><iframe id="mentor-frame" title="Coding Mentor" src="/demo/"></iframe></section>
-      <section class="panel" id="interview-panel" role="tabpanel" aria-labelledby="interview-tab"><iframe title="Interview Engine" src="/"></iframe></section>
+      <section class="panel" id="execution-panel" role="tabpanel" aria-labelledby="execution-tab"><iframe title="Execution Lab" src="/?view=lab&merged=1"></iframe></section>
+      <section class="panel" id="interview-panel" role="tabpanel" aria-labelledby="interview-tab"><iframe title="Interview Engine" src="/?view=interview&merged=1"></iframe></section>
     </main>
     <script>
       const accessToken = localStorage.getItem('mentor_access_token');
@@ -60,9 +62,14 @@
         localStorage.setItem('mentor_workspace_session_id', session.id);
         return session.id;
       };
+      const hasValidLearningSession = async (sessionId) => {
+        if (!sessionId) return false;
+        const response = await fetch(`/sessions/${sessionId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+        return response.ok;
+      };
       const prepareMentor = async () => {
         let sessionId = localStorage.getItem('mentor_workspace_session_id');
-        if (!sessionId) sessionId = await createLearningSession();
+        if (!(await hasValidLearningSession(sessionId))) sessionId = await createLearningSession();
         const frame = document.getElementById('mentor-frame');
         const documentInFrame = frame.contentDocument;
         if (!documentInFrame) return;
@@ -72,6 +79,32 @@
         if (sessionInput) sessionInput.value = sessionId;
         const sessionOutput = documentInFrame.getElementById('session-output');
         if (sessionOutput) sessionOutput.textContent = 'Learning session ready.';
+        createRockyButton(documentInFrame);
+        syncRockyButton();
+      };
+      const createRockyButton = (documentInFrame) => {
+        let button = documentInFrame.getElementById('rocky-live-toggle');
+        if (button) return button;
+        button = documentInFrame.createElement('button');
+        button.type = 'button';
+        button.id = 'rocky-live-toggle';
+        button.textContent = 'Turn on Live Agent Rocky';
+        const codeLabel = documentInFrame.querySelector('label[for="code"]');
+        codeLabel?.before(button);
+        button.addEventListener('click', () => {
+          documentInFrame.getElementById('live-tutor-toggle')?.click();
+          syncRockyButton();
+        });
+        return button;
+      };
+      const syncRockyButton = () => {
+        const documentInFrame = document.getElementById('mentor-frame').contentDocument;
+        const button = documentInFrame?.getElementById('rocky-live-toggle');
+        const liveButton = documentInFrame?.getElementById('live-tutor-toggle');
+        if (!button) return;
+        const isOn = liveButton?.textContent.includes('ON');
+        button.disabled = !liveButton;
+        button.textContent = isOn ? 'Turn off Live Agent Rocky' : 'Turn on Live Agent Rocky';
       };
       document.getElementById('mentor-frame').addEventListener('load', () => {
         prepareMentor().catch((error) => console.error('Unable to prepare learning session', error));

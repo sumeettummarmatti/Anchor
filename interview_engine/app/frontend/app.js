@@ -12,7 +12,19 @@ print("Result:", result)`;
 
 const state = { trace: null, stepIndex: 0, playing: false, timer: null, playSpeed: 1, voiceEnabled: true, ttsAvailable: false, recognitionConstructor: null, recognition: null, recognitionActive: false, voiceBaseAnswer: "", voiceFinalTranscript: "", structurePositions: {} };
 const PLAYBACK_BASE_DELAY = 1000;
-const authHeaders = { "X-API-Key": "dev-api-key", "X-User-ID": "ui-user" };
+const mentorAccessToken = localStorage.getItem("mentor_access_token");
+const mentorSessionId = localStorage.getItem("mentor_workspace_session_id");
+function mentorUserId() {
+  if (!mentorAccessToken) return null;
+  try {
+    const payload = mentorAccessToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(payload)).sub || null;
+  } catch (_) { return null; }
+}
+const activeUserId = mentorUserId();
+const authHeaders = mentorAccessToken
+  ? { Authorization: `Bearer ${mentorAccessToken}` }
+  : { "X-API-Key": "dev-api-key", "X-User-ID": "ui-user" };
 const $ = (id) => document.getElementById(id);
 function showToast(message) { const toast = $("toast"); toast.textContent = message; toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 2600); }
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c])); }
@@ -135,12 +147,16 @@ function initialiseVoiceFeatures() {
 }
 function setView(view) { if (view !== "interview") stopVoiceInput(); document.querySelectorAll(".view").forEach((el) => el.classList.add("hidden")); $(`${view}-view`).classList.remove("hidden"); $("page-title").textContent = view === "lab" ? "Execution Lab" : view === "interview" ? "Interview Coach" : "Analytics"; document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === view)); if (view === "analytics") loadAnalytics(); }
 $("source-code").value = sampleCode; syncEditor(); setPlaybackSpeed(state.playSpeed); ensureVoiceControls(); initialiseVoiceFeatures(); $("source-code").addEventListener("input", syncEditor); $("run-button").addEventListener("click", runTrace); $("play-button").addEventListener("click", togglePlay); $("next-button").addEventListener("click", () => selectStep(state.stepIndex + 1)); $("prev-button").addEventListener("click", () => selectStep(state.stepIndex - 1)); $("restart-button").addEventListener("click", () => selectStep(0)); document.querySelectorAll("[data-play-speed]").forEach((button) => button.addEventListener("click", () => setPlaybackSpeed(button.dataset.playSpeed))); document.querySelectorAll("[data-view]").forEach((item) => item.addEventListener("click", () => setView(item.dataset.view))); window.addEventListener("beforeunload", stopVoiceInput); document.addEventListener("keydown", (event) => { if (event.target.tagName === "TEXTAREA") return; if (event.key === "ArrowRight") selectStep(state.stepIndex + 1); if (event.key === "ArrowLeft") selectStep(state.stepIndex - 1); if (event.key === " ") { event.preventDefault(); togglePlay(); } });
+const embeddedParams = new URLSearchParams(window.location.search);
+const embeddedView = embeddedParams.get("view");
+if (["lab", "interview", "analytics"].includes(embeddedView)) setView(embeddedView);
+if (embeddedParams.get("merged") === "1") document.querySelector(".sidebar")?.remove();
 $("source-code").value = ""; syncEditor(); $("load-example-button").addEventListener("click", () => { $("source-code").value = sampleCode; syncEditor(); $("source-status").textContent = "Example loaded — edit it freely"; });
 
 let interviewId = null;
 function addInterviewMessage(role, content) { const box = $("interview-messages"); if (box.querySelector(".empty-state")) box.innerHTML = ""; const item = document.createElement("div"); item.className = `message ${role === "AI" ? "ai" : "user"}`; item.innerHTML = `<span class="message-label">${role}</span>${escapeHtml(content).replace(/\n/g, "<br>")}`; box.appendChild(item); box.scrollTop = box.scrollHeight; if (role === "AI") speakInterviewMessage(content); }
 async function startInterview() {
-  const payload = { context: { submission_id: `ui-${Date.now()}`, user_id: "ui-user", problem_title: $("interview-title").value, problem_description: $("interview-description").value, language: $("interview-language").value, code: $("interview-code").value, execution_result: $("interview-execution").value, hint_count: Number($("interview-hints").value), attempt_count: Number($("interview-attempts").value), difficulty: $("interview-difficulty").value }, style: "Friendly" };
+  const payload = { context: { submission_id: mentorSessionId || `ui-${Date.now()}`, user_id: activeUserId || "ui-user", problem_title: $("interview-title").value, problem_description: $("interview-description").value, language: $("interview-language").value, code: $("interview-code").value, execution_result: $("interview-execution").value, hint_count: Number($("interview-hints").value), attempt_count: Number($("interview-attempts").value), difficulty: $("interview-difficulty").value }, style: "Friendly" };
   try { const response = await fetch("/interview/start", { method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" }, body: JSON.stringify(payload) }); if (!response.ok) throw new Error(await response.text()); const data = await response.json(); interviewId = data.interview_id; $("interview-messages").innerHTML = ""; $("interview-state").textContent = "WAITING FOR ANSWER"; addInterviewMessage("AI", data.first_question); showToast("Interview started"); } catch (error) { showToast("Could not start interview"); console.error(error); }
 }
 async function submitInterviewAnswer() { if (!interviewId) return showToast("Start an interview first"); const answer = $("interview-answer").value.trim(); if (!answer) return showToast("Write an answer first"); stopVoiceInput(); try { const response = await fetch(`/interview/${interviewId}/answer`, { method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" }, body: JSON.stringify({ answer }) }); if (!response.ok) throw new Error(await response.text()); const data = await response.json(); addInterviewMessage("USER", answer); $("interview-answer").value = ""; const score = data.evaluation; addInterviewMessage("AI", `Evaluation — technical ${score.technical_accuracy}/10, communication ${score.communication}/10, complexity ${score.complexity_understanding}/10, edge cases ${score.edge_case_reasoning}/10. ${score.feedback}`); addInterviewMessage("AI", data.next_question || "That completes the planned questions. You can finish the interview now."); $("interview-state").textContent = data.next_question ? "FOLLOW-UP READY" : "COMPLETED"; if (!data.next_question) stopVoiceInput(); } catch (error) { showToast("Could not submit answer"); console.error(error); } }
