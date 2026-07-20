@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from ...core.security import get_authenticated_user
 from ...core.llm import request_groq_client
 from ..schemas.interview import InterviewCreate, AnswerRequest, InterviewResponse, InterviewView
-from ..schemas.evaluation import AnswerResponse
+from ..schemas.evaluation import AnswerExampleResponse, AnswerResponse, NextQuestionResponse
 from ..schemas.report import InterviewReport
 
 def create_router(service):
@@ -27,6 +27,21 @@ def create_router(service):
         try: evaluation, question = service.answer(interview_id, payload.answer, llm=request_groq_client(request))
         except ValueError as exc: raise HTTPException(409, str(exc))
         return AnswerResponse(evaluation=evaluation, next_question=question)
+
+    @router.post("/{interview_id}/answer-example", response_model=AnswerExampleResponse)
+    def answer_example(interview_id: str, request: Request, current_user: str = Depends(get_authenticated_user)):
+        owner(interview_id, current_user)
+        try:
+            answer, provider_used = service.answer_example(interview_id, llm=request_groq_client(request))
+        except ValueError as exc: raise HTTPException(409, str(exc))
+        return AnswerExampleResponse(answer=answer, provider_used=provider_used)
+
+    @router.post("/{interview_id}/next-question", response_model=NextQuestionResponse)
+    def next_question(interview_id: str, current_user: str = Depends(get_authenticated_user)):
+        owner(interview_id, current_user)
+        try:
+            return NextQuestionResponse(next_question=service.next_question(interview_id))
+        except ValueError as exc: raise HTTPException(409, str(exc))
 
     @router.post("/{interview_id}/finish", response_model=InterviewReport)
     def finish(interview_id: str, request: Request, current_user: str = Depends(get_authenticated_user)):

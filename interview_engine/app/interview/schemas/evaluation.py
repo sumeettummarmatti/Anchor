@@ -13,3 +13,12 @@ class Evaluation(BaseModel):
 class AnswerResponse(BaseModel):
     evaluation: Evaluation
     next_question: Optional[str]
+
+
+class AnswerExampleResponse(BaseModel):
+    answer: str
+    provider_used: str
+
+
+class NextQuestionResponse(BaseModel):
+    next_question: Optional[str]

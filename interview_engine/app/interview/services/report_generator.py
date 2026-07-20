@@ -23,8 +23,8 @@ class ReportGenerator:
                     return InterviewReport(**repaired)
                 except (LLMCallError, ValidationError) as repair_exc:
                     logger.warning("Report repair failed; using fallback type=%s detail=%s", type(repair_exc).__name__, str(repair_exc)[:240])
-            except LLMAuthError:
-                raise
+            except LLMAuthError as exc:
+                logger.warning("Report generator falling back after LLM authentication failure detail=%s", str(exc)[:240])
             except LLMCallError as exc:
                 logger.warning("Report generator falling back after LLM failure type=%s detail=%s", type(exc).__name__, str(exc)[:240])
         if not evaluations:

@@ -15,6 +15,7 @@ from .interview.services.planner import Planner
 from .interview.services.evaluator import Evaluator
 from .interview.services.report_generator import ReportGenerator
 from .interview.services.followup_generator import FollowupGenerator
+from .interview.services.answer_coach import AnswerCoach
 from .core.llm import GroqClient, LLMAuthError
 from .interview.routers.interview import create_router
 from .visualization.repositories.visualization_repository import VisualizationRepository
@@ -39,7 +40,7 @@ analytics_repository = SQLiteAnalyticsRepository(os.getenv("ANALYTICS_SQLITE_PAT
 analytics_event_processor = EventProcessor(analytics_repository)
 analytics_event_publisher = EventPublisher(analytics_event_processor)
 analytics_service = AnalyticsService(analytics_repository)
-service = InterviewService(repository, planner=Planner(llm), evaluator=Evaluator(llm), followups=FollowupGenerator(llm), reports=ReportGenerator(llm), event_publisher=analytics_event_publisher)
+service = InterviewService(repository, planner=Planner(llm), evaluator=Evaluator(llm), followups=FollowupGenerator(llm), reports=ReportGenerator(llm), answer_coach=AnswerCoach(llm), event_publisher=analytics_event_publisher)
 visualization_repository = VisualizationRepository()
 visualization_service = VisualizationService(visualization_repository, explainer=AIExplainer(llm), summary=SummaryGenerator(llm), event_publisher=analytics_event_publisher)
 app = FastAPI(title="Independent AI Technical Interview Engine", version="1.0.0")

@@ -5,6 +5,11 @@ from interview_engine.app.interview.schemas.interview import InterviewCreate, An
 from interview_engine.app.interview.schemas.submission_context import SubmissionContext
 from interview_engine.app.interview.schemas.evaluation import Evaluation
 from interview_engine.app.interview.services.context_builder import build_context
+from interview_engine.app.interview.services.planner import Planner
+from interview_engine.app.interview.services.evaluator import Evaluator
+from interview_engine.app.interview.services.followup_generator import FollowupGenerator
+from interview_engine.app.interview.services.report_generator import ReportGenerator
+from interview_engine.app.core.llm import LLMAuthError
 
 def request():
     return InterviewCreate(context=SubmissionContext(submission_id="s1", user_id="u1", problem_title="Two Sum", problem_description="Find two numbers", language="python", code="return []", execution_result="passed", hint_count=0, attempt_count=1, difficulty="Easy"))
@@ -36,18 +41,23 @@ def test_repository_operations_are_copy_safe():
 
 class FollowupOnce:
     def __init__(self): self.called = False
-    def generate(self, question, answer, score):
+    def generate(self, question, answer, score, context=None):
         if not self.called:
             self.called = True
             return "Follow up on question one"
         return None
 
 class AlwaysFollowup:
-    def generate(self, question, answer, score): return "Deeper follow-up"
+    def generate(self, question, answer, score, context=None): return "Deeper follow-up"
 
 class LowEvaluator:
     def evaluate(self, question, answer, context):
         return Evaluation(technical_accuracy=1, communication=1, complexity_understanding=1, edge_case_reasoning=1, confidence=1, feedback="low")
+
+
+class AuthFailLLM:
+    def complete_json(self, system, user):
+        raise LLMAuthError("simulated provider authentication failure")
 
 class ThreeQuestionPlanner:
     def create_plan(self, context, company=None, style="Friendly"): return ["Planned Q1", "Planned Q2", "Planned Q3"]
@@ -75,6 +85,17 @@ def test_followups_are_capped_per_planned_question():
     assert saved.consecutive_followups == 0
     assert saved.total_turns == 3
 
+
+def test_interview_answer_uses_fallbacks_when_the_model_is_unavailable():
+    llm = AuthFailLLM()
+    service = InterviewService(
+        InMemoryInterviewRepository(),
+        planner=Planner(llm), evaluator=Evaluator(llm), followups=FollowupGenerator(llm), reports=ReportGenerator(llm),
+    )
+    interview = service.start(request())
+    evaluation, _ = service.answer(interview.id, "I would use a hash map and explain the lookup trade-off.")
+    assert evaluation.technical_accuracy > 0
+
 def test_followup_fallback_uses_different_context_templates():
     from interview_engine.app.interview.services.followup_generator import FollowupGenerator
     generator = FollowupGenerator()
@@ -94,3 +115,31 @@ def test_context_builder_derives_execution_and_struggle_signals():
     enriched = build_context(struggled)
     assert enriched["execution_status"] == "not_passed"
     assert enriched["struggle_level"] == "high"
+
+
+def test_fallback_questions_reference_the_submitted_code():
+    questions = Planner().create_plan({"problem_title": "Two Sum", "problem_description": "Find a pair", "difficulty": "Easy", "code": "def locate_pair(nums):\n    return nums"})
+    assert all("`locate_pair`" in question for question in questions)
+
+
+def test_answer_coach_fallback_uses_the_submitted_code():
+    from interview_engine.app.interview.services.answer_coach import AnswerCoach
+    answer, provider = AnswerCoach().generate("Explain the code", {"code": "def locate_pair(nums):\n    return nums"})
+    assert "`locate_pair`" in answer
+    assert provider == "fallback"
+
+
+def test_answer_example_is_available_for_the_current_question():
+    service = InterviewService(InMemoryInterviewRepository())
+    interview = service.start(request())
+    answer, provider = service.answer_example(interview.id)
+    assert answer
+    assert provider == "fallback"
+
+
+def test_next_question_skips_without_creating_an_evaluation():
+    service = InterviewService(InMemoryInterviewRepository(), planner=ThreeQuestionPlanner())
+    interview = service.start(request())
+    next_question = service.next_question(interview.id)
+    assert next_question == "Planned Q2"
+    assert service.require(interview.id).total_turns == 0

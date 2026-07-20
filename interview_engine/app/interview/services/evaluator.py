@@ -6,24 +6,77 @@ from ...core.llm import LLMClient, LLMAuthError, LLMCallError, complete_json_wit
 
 logger = logging.getLogger(__name__)
 
+NO_KNOWLEDGE_RESPONSES = {
+    "i dont know", "i do not know", "idk", "no idea", "not sure",
+    "i am not sure", "i cannot answer", "i cant answer",
+}
+
+
+def is_explicit_no_knowledge_answer(answer: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9 ]+", "", answer.lower()).strip()
+    return normalized in NO_KNOWLEDGE_RESPONSES
+
+
+def all_scores_zero(evaluation: Evaluation) -> bool:
+    return all(
+        score == 0
+        for score in (
+            evaluation.technical_accuracy,
+            evaluation.communication,
+            evaluation.complexity_understanding,
+            evaluation.edge_case_reasoning,
+            evaluation.confidence,
+        )
+    )
+
+
+def minimum_attempt_score(evaluation: Evaluation) -> Evaluation:
+    """Never treat a non-empty attempted answer as an explicit no-answer response."""
+    if not all_scores_zero(evaluation):
+        return evaluation
+    return Evaluation(
+        technical_accuracy=1,
+        communication=1,
+        complexity_understanding=1,
+        edge_case_reasoning=1,
+        confidence=1,
+        feedback="Your response is an attempt, but it needs a concrete approach, reasoning, and examples to earn a stronger score.",
+        provider_used=evaluation.provider_used,
+    )
+
+
 class Evaluator:
     def __init__(self, llm: LLMClient = None): self.llm = llm
     def evaluate(self, question: str, answer: str, context: dict) -> Evaluation:
+        if is_explicit_no_knowledge_answer(answer):
+            return Evaluation(
+                technical_accuracy=0,
+                communication=0,
+                complexity_understanding=0,
+                edge_case_reasoning=0,
+                confidence=0,
+                feedback="You said you do not know the answer. Try explaining one small next step or asking for a hint.",
+            )
         if self.llm:
             try:
-                result = complete_json_with_retry(self.llm, "Evaluate a technical interview answer. Return JSON with technical_accuracy, communication, complexity_understanding, edge_case_reasoning, confidence (integers 0-10), and feedback.", str({"question": question, "answer": answer, "submission": context}), "evaluator")
+                result = complete_json_with_retry(self.llm, """Evaluate a technical interview answer against the question and submitted code. Return JSON only with technical_accuracy, communication, complexity_understanding, edge_case_reasoning, confidence (all integers 0-10), and feedback. Assess the answer's actual reasoning, not keyword count. Score 0 in every category only for an explicit no-answer or refusal such as 'I don't know'. A partial but genuine attempt must receive a nuanced score: give credit for what is correct, score omitted areas lower rather than zeroing the whole card, and give specific feedback about the next improvement.""", str({"question": question, "answer": answer, "submission": context}), "evaluator")
                 result["provider_used"] = "llm"
-                return Evaluation(**result)
+                evaluation = Evaluation(**result)
+                if all_scores_zero(evaluation):
+                    repaired = repair_json_with_retry(self.llm, result, "Reassess this non-empty interview answer. technical_accuracy, communication, complexity_understanding, edge_case_reasoning, confidence must be nuanced integers 0-10; do not return all zero unless the answer explicitly says it does not know. feedback must explain the assessment.", "evaluator")
+                    repaired["provider_used"] = "llm"
+                    evaluation = Evaluation(**repaired)
+                return minimum_attempt_score(evaluation)
             except ValidationError as exc:
                 logger.error("LLM schema validation failure component=evaluator type=%s detail=%s", type(exc).__name__, str(exc)[:240])
                 try:
                     repaired = repair_json_with_retry(self.llm, result, "technical_accuracy, communication, complexity_understanding, edge_case_reasoning, confidence: integers 0-10; feedback: string", "evaluator")
                     repaired["provider_used"] = "llm"
-                    return Evaluation(**repaired)
+                    return minimum_attempt_score(Evaluation(**repaired))
                 except (LLMCallError, ValidationError) as repair_exc:
                     logger.warning("Evaluator repair failed; using fallback type=%s detail=%s", type(repair_exc).__name__, str(repair_exc)[:240])
-            except LLMAuthError:
-                raise
+            except LLMAuthError as exc:
+                logger.warning("Evaluator falling back after LLM authentication failure detail=%s", str(exc)[:240])
             except LLMCallError as exc:
                 logger.warning("Evaluator falling back after LLM failure type=%s detail=%s", type(exc).__name__, str(exc)[:240])
         # Coarse fallback only: this is deliberately not a fair grader. It keeps

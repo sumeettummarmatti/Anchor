@@ -13,6 +13,7 @@ from .interviewer import Interviewer
 from .evaluator import Evaluator
 from .followup_generator import FollowupGenerator
 from .report_generator import ReportGenerator
+from .answer_coach import AnswerCoach
 from ...analytics.utils.event_publisher import NullEventPublisher
 
 TRANSITIONS = {
@@ -25,9 +26,9 @@ TRANSITIONS = {
 
 class InterviewService:
     MAX_CONSECUTIVE_FOLLOWUPS = 2
-    def __init__(self, repository, planner=None, interviewer=None, evaluator=None, followups=None, reports=None, *, event_publisher=None):
+    def __init__(self, repository, planner=None, interviewer=None, evaluator=None, followups=None, reports=None, answer_coach=None, *, event_publisher=None):
         self.repository = repository; self.planner = planner or Planner(); self.interviewer = interviewer or Interviewer()
-        self.evaluator = evaluator or Evaluator(); self.followups = followups or FollowupGenerator(); self.reports = reports or ReportGenerator()
+        self.evaluator = evaluator or Evaluator(); self.followups = followups or FollowupGenerator(); self.reports = reports or ReportGenerator(); self.answer_coach = answer_coach or AnswerCoach()
         self.event_publisher = event_publisher or NullEventPublisher()
         self._mutation_locks = {}
         self._mutation_locks_guard = threading.Lock()
@@ -95,7 +96,7 @@ class InterviewService:
         )
         followup = None
         if interview.consecutive_followups < self.MAX_CONSECUTIVE_FOLLOWUPS:
-            followup = followups.generate(interview.current_question or "", answer, min(evaluation.technical_accuracy, evaluation.communication))
+            followup = followups.generate(interview.current_question or "", answer, min(evaluation.technical_accuracy, evaluation.communication), interview.context)
         if followup:
             interview.consecutive_followups += 1
             self.transition(interview, InterviewState.FOLLOW_UP); interview.current_question = followup; self.repository.save(interview)
@@ -117,6 +118,39 @@ class InterviewService:
             raise ValueError("Interview mutation already in progress")
         try:
             return self._finish_locked(interview_id, llm)
+        finally:
+            lock.release()
+
+    def answer_example(self, interview_id, llm=None):
+        interview = self.require(interview_id)
+        if interview.state != InterviewState.WAITING_FOR_ANSWER:
+            raise ValueError("Interview is not currently asking a question")
+        coach = AnswerCoach(llm) if llm is not None else self.answer_coach
+        return coach.generate(interview.current_question or "", interview.context)
+
+    def next_question(self, interview_id):
+        lock = self._mutation_lock(interview_id)
+        if not lock.acquire(blocking=False):
+            raise ValueError("Interview mutation already in progress")
+        try:
+            interview = self.require(interview_id)
+            if interview.state != InterviewState.WAITING_FOR_ANSWER:
+                raise ValueError("Interview is not currently asking a question")
+            interview.planned_question_index += 1
+            interview.consecutive_followups = 0
+            question = self.interviewer.next_question(interview.questions, interview.planned_question_index)
+            if question:
+                self.transition(interview, InterviewState.QUESTIONING)
+                interview.current_question = question
+                self.repository.save(interview)
+                self.repository.add_message(InterviewMessage(str(uuid4()), interview.id, "AI", question))
+                self.transition(interview, InterviewState.WAITING_FOR_ANSWER)
+            else:
+                interview.current_question = None
+                interview.completed_at = datetime.now(timezone.utc)
+                self.repository.save(interview)
+                self.transition(interview, InterviewState.COMPLETED)
+            return self.require(interview_id).current_question
         finally:
             lock.release()
 

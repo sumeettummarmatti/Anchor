@@ -89,10 +89,8 @@
     <div id="llm-status" class="llm-status" role="status" aria-live="polite">LLM: checking…</div>
     <main>
       <div class="page-actions"><button type="button" class="icon-button" data-theme-toggle aria-label="Use light theme" title="Use light theme">☀</button></div>
-      <div class="eyebrow">Local API demo · phases 5 & 6</div>
       <h1>Mentor Lab.</h1>
       <p class="intro">Meet your coding mentor in a small browser workspace for running code, inspecting Ruff diagnostics, and getting Socratic guidance from your local model.</p>
-      <div class="status"><span class="dot"></span><span id="health">Checking API health…</span></div>
 
       <section class="grid">
         <form class="card" id="auth-form">
@@ -542,8 +540,7 @@ print(greet("learner"))</textarea>
           setLLMStatus('unavailable', error?.detail || 'The API is unavailable.');
         }
       };
-      request('/health').then(() => $('health').textContent = 'API online · Phase 5 & 6 ready').catch(() => {
-        $('health').textContent = 'API unavailable · start the backend first';
+      request('/health').catch(() => {
         setLLMStatus('unavailable', 'Start the backend first.');
       });
       checkLLMStatus();
