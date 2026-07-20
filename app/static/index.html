@@ -143,6 +143,7 @@ print(greet("learner"))</textarea>
             <button type="button" id="analyze">Analyze code</button>
             <button type="button" id="run" class="secondary">Run code</button>
           </div>
+          <p id="analysis-status" class="hint" role="status">Run code to include Ruff diagnostics in the response console.</p>
         </section>
 
         <section class="card">
@@ -161,7 +162,7 @@ print(greet("learner"))</textarea>
 
         <section class="card wide">
           <h2>Response console</h2>
-          <pre id="output">Sign in, create a session, then try Analyze code.</pre>
+          <pre id="output">Sign in, create a session, then try Run code.</pre>
         </section>
       </section>
       <div id="rocky" aria-live="polite">
@@ -186,7 +187,6 @@ print(greet("learner"))</textarea>
       const $ = (id) => document.querySelector(`#${id}`);
       const output = $('output');
       const token = () => localStorage.getItem('mentor_access_token');
-      const show = (value) => { output.textContent = JSON.stringify(value, null, 2); };
       const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
         '&': '&amp;',
         '<': '&lt;',
@@ -301,10 +301,10 @@ print(greet("learner"))</textarea>
         badge.textContent = state === 'ok' ? `LLM online · ${detail || 'ready'}` : 'LLM not connected';
         badge.title = detail || (state === 'unavailable' ? 'Start Ollama or LM Studio.' : '');
       };
-      const showError = (error) => {
+      const showError = (error, target = $('auth-state')) => {
         const detail = error?.detail || error;
         if (/AI provider|LLM|model/i.test(String(detail))) setLLMStatus('unavailable', String(detail));
-        show(detail);
+        if (target) target.textContent = String(detail);
       };
       const request = async (path, options = {}) => {
         const headers = { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) };
@@ -324,8 +324,7 @@ print(greet("learner"))</textarea>
         try {
           const user = await request('/auth/register', { method: 'POST', body: JSON.stringify({ display_name: $('display-name').value, email: $('email').value, password: $('password').value }) });
           $('auth-state').textContent = `Account created for ${user.email}. Log in next.`;
-          show(user);
-        } catch (error) { showError(error); }
+        } catch (error) { showError(error, $('auth-state')); }
       });
       $('auth-form').addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -334,11 +333,13 @@ print(greet("learner"))</textarea>
           localStorage.setItem('mentor_access_token', tokens.access_token);
           localStorage.setItem('mentor_refresh_token', tokens.refresh_token);
           $('auth-state').textContent = 'Logged in. Access and refresh tokens stored locally.';
-          show({ message: 'Logged in', token_type: tokens.token_type });
-        } catch (error) { showError(error); }
+        } catch (error) { showError(error, $('auth-state')); }
       });
       $('profile').addEventListener('click', async () => {
-        try { show(await request('/users/me', { headers: authHeaders() })); } catch (error) { showError(error); }
+        try {
+          const profile = await request('/users/me', { headers: authHeaders() });
+          $('auth-state').textContent = `Signed in as ${profile.display_name || profile.email || 'your account'}.`;
+        } catch (error) { showError(error, $('auth-state')); }
       });
       $('session-form').addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -348,8 +349,7 @@ print(greet("learner"))</textarea>
           const session = await request('/sessions', { method: 'POST', headers, body: JSON.stringify({ project_id: project.id }) });
           $('session-id').value = session.id;
           $('session-output').textContent = JSON.stringify(session, null, 2);
-          show({ project, session });
-        } catch (error) { showError(error); }
+        } catch (error) { showError(error, $('session-output')); }
       });
       const ensureSession = async () => {
         if ($('session-id').value) return $('session-id').value;
@@ -360,7 +360,13 @@ print(greet("learner"))</textarea>
         return session.id;
       };
       $('analyze').addEventListener('click', async () => {
-        try { show(await request('/static-analysis/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify(codePayload()) })); } catch (error) { showError(error); }
+        try {
+          const analysis = await request('/static-analysis/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify(codePayload()) });
+          const count = analysis?.diagnostics?.length || 0;
+          $('analysis-status').textContent = count
+            ? `Ruff found ${count} issue${count === 1 ? '' : 's'}. Run code to see the full result in the response console.`
+            : 'Ruff found no issues. Run code to see the full result in the response console.';
+        } catch (error) { showError(error, $('analysis-status')); }
       });
       const checkStuckScore = async (sessionId) => {
         if (!sessionId) return;
@@ -381,14 +387,13 @@ print(greet("learner"))</textarea>
           showExecution(execution);
           await explainExecution(execution, sessionId);
           await checkStuckScore(sessionId);
-        } catch (error) { showError(error); }
+        } catch (error) { showError(error, output); }
       });
       if ($('recommend')) $('recommend').addEventListener('click', async () => {
         try {
           const recommendations = await request('/problems/recommended?k=5', { headers: authHeaders() });
           if ($('recommendation-output')) $('recommendation-output').textContent = JSON.stringify(recommendations, null, 2);
-          show(recommendations);
-        } catch (error) { showError(error); }
+        } catch (error) { showError(error, $('recommendation-output')); }
       });
       const explainExecution = async (execution, sessionId) => {
         const explanationOutput = $('explanation-output');
@@ -428,7 +433,7 @@ print(greet("learner"))</textarea>
       $('hint').addEventListener('click', async () => {
         try {
           await requestProgressiveHint();
-        } catch (error) { showError(error); }
+        } catch (error) { showError(error, $('hint-output')); }
       });
 
       let liveModeActive = false;
@@ -522,7 +527,7 @@ print(greet("learner"))</textarea>
             rockyMeta.textContent = error?.name === 'AbortError' ? 'Rocky · still watching' : 'Rocky · offline';
             setRockyState('error');
             setTimeout(() => setRockyState('idle'), 900);
-            if (error?.name !== 'AbortError') showError(error);
+            if (error?.name !== 'AbortError') rockyMeta.textContent = `Rocky · ${error?.detail || 'offline'}`;
           }
         } finally {
           clearTimeout(timeout);
@@ -571,7 +576,7 @@ print(greet("learner"))</textarea>
         }, LIVE_PAUSE_MS);
       });
       $('rocky-hint').addEventListener('click', async () => {
-        try { await requestProgressiveHint(); } catch (error) { showError(error); }
+        try { await requestProgressiveHint(); } catch (error) { showError(error, $('hint-output')); }
       });
       const askRocky = async () => {
         const message = rockyReply.value.trim();
@@ -591,7 +596,6 @@ print(greet("learner"))</textarea>
           rockyReply.value = '';
           showMentor(response);
         } catch (error) {
-          showError(error);
           showRockyMessage(error?.detail || 'I could not reach the mentor model.', 'Rocky · offline');
         } finally {
           rockyReply.disabled = false;
@@ -612,7 +616,7 @@ print(greet("learner"))</textarea>
         try {
           await request('/mentor/live-nudge/feedback', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ session_id: $('session-id').value, helpful: false }) });
           hideRockyBubble();
-        } catch (error) { showError(error); }
+        } catch (error) { showError(error, rockyMeta); }
       });
       rockyCharacter.addEventListener('pointerdown', (event) => {
         rockyDragged = false;
