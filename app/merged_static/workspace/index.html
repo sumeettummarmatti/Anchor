@@ -20,6 +20,12 @@
       .panel.active { display: block; }
       iframe { display: block; width: 100%; height: 100%; border: 0; background: #08101e; }
       @media (max-width: 600px) { header { align-items: flex-start; flex-wrap: wrap; } nav { order: 3; width: 100%; height: 42px; } nav button { flex: 1; } .panel { height: calc(100vh - 129px); } }
+      body { background: radial-gradient(circle at 50% -20%, rgba(124, 58, 237, .26), transparent 42%), #05050d; }
+      header { border-color: rgba(176, 144, 255, .2); background: rgba(7, 6, 19, .92); box-shadow: 0 1px 28px rgba(0, 0, 0, .32); }
+      .brand span { color: #c4b5fd; }
+      nav button { border: 1px solid transparent; color: #c9c4dd; }
+      button[aria-selected="true"] { border-color: rgba(196, 181, 253, .26); background: linear-gradient(135deg, rgba(124, 58, 237, .78), rgba(192, 38, 211, .7)); color: #fff; box-shadow: 0 8px 20px rgba(124, 58, 237, .22); }
+      button.logout { border-color: rgba(196, 181, 253, .3); color: #ede9fe; background: rgba(255, 255, 255, .05); }
     </style>
   </head>
   <body>
