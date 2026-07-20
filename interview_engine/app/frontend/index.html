@@ -4,7 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tracewise — Execution Intelligence</title>
-  <link rel="stylesheet" href="/static/styles.css?v=20260720-violet-theme">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/merged/design-system.css">
+  <link rel="stylesheet" href="/static/styles.css?v=20260720-theme-round2">
+  <script>
+    (() => {
+      const theme = localStorage.getItem('ui_theme');
+      document.documentElement.dataset.theme = theme === 'light' || theme === 'dark' ? theme : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      if (localStorage.getItem('sidebar_collapsed') === 'true') document.documentElement.classList.add('sidebar-collapsed');
+    })();
+  </script>
+  <script src="/merged/ui-preferences.js" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -14,7 +26,7 @@
       <button class="nav-item active" data-view="lab"><span>◈</span> Execution Lab</button>
       <button class="nav-item" data-view="interview"><span>◌</span> Interview Coach <em>soon</em></button>
       <button class="nav-item" data-view="analytics"><span>⌁</span> Analytics</button>
-      <div class="sidebar-bottom"><div class="system-status"><span class="status-dot"></span> Engine online</div><a href="/docs" target="_blank" class="docs-link">API documentation ↗</a></div>
+      <div class="sidebar-bottom"><div class="sidebar-tools"><button type="button" class="sidebar-collapse-toggle" data-sidebar-toggle aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar"><span aria-hidden="true">‹</span><span data-sidebar-label>Collapse</span></button><button type="button" class="theme-toggle" data-theme-toggle aria-label="Use light theme" title="Use light theme">☀</button></div><div class="system-status"><span class="status-dot"></span> Engine online</div><a href="/docs" target="_blank" class="docs-link">API documentation ↗</a></div>
     </aside>
     <main class="main-content">
       <header class="topbar"><div><p class="eyebrow">EXECUTION INTELLIGENCE</p><h1 id="page-title">Execution Lab</h1></div><div class="topbar-actions"><span class="api-pill"><span class="status-dot"></span> Local API</span></div></header>
@@ -32,7 +44,7 @@
         </div>
         <section class="summary-strip panel"><div class="summary-intro"><p class="section-kicker">TRACE SUMMARY</p><h2>Your execution story</h2><p id="summary-flow">Run a trace to generate an overview of the algorithm flow, events, and output.</p></div><div class="summary-metrics"><div><span>Steps</span><strong id="metric-steps">—</strong></div><div><span>Functions</span><strong id="metric-functions">—</strong></div><div><span>Output</span><strong id="metric-output">—</strong></div></div></section>
       </section>
-      <section id="interview-view" class="view hidden"><div class="interview-layout"><section class="panel interview-setup"><div class="panel-header"><div><p class="section-kicker">PHASE 9</p><h2>Start a technical interview</h2></div><span class="api-pill">Groq-ready</span></div><div class="form-grid"><label>Problem title<input id="interview-title" value="Two Sum"></label><label>Difficulty<select id="interview-difficulty"><option>Easy</option><option>Medium</option><option>Hard</option></select></label><label class="full">Problem description<textarea id="interview-description">Find two numbers in an array that add up to a target.</textarea></label><label class="full">Submitted code<textarea id="interview-code">def two_sum(nums, target):
+      <section id="interview-view" class="view hidden"><div class="interview-layout"><section class="panel interview-setup"><div class="panel-header"><div><p class="section-kicker">INTERVIEW SETUP</p><h2>Start a technical interview</h2></div><span class="api-pill">Groq-ready</span></div><div class="form-grid"><label>Problem title<input id="interview-title" value="Two Sum"></label><label>Difficulty<select id="interview-difficulty"><option>Easy</option><option>Medium</option><option>Hard</option></select></label><label class="full">Problem description<textarea id="interview-description">Find two numbers in an array that add up to a target.</textarea></label><label class="full">Submitted code<textarea id="interview-code">def two_sum(nums, target):
     seen = {}
     for index, value in enumerate(nums):
         complement = target - value

@@ -6,6 +6,7 @@ import time
 from typing import Any, Dict, Optional
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from fastapi import HTTPException, Request as FastAPIRequest
 
 logger = logging.getLogger(__name__)
 
@@ -157,3 +158,19 @@ class GroqClient(OpenAICompatibleClient):
         if client is None:
             raise RuntimeError("GROQ_API_KEY is required. Add it to interview_engine/.env before starting the server.")
         return client
+
+
+def request_groq_client(request: FastAPIRequest) -> Optional[GroqClient]:
+    key = request.headers.get("X-Groq-Api-Key")
+    if key is None:
+        return None
+    key = key.strip()
+    if not key:
+        return None
+    if len(key) > 512:
+        raise HTTPException(status_code=400, detail="Groq API key is too long.")
+    try:
+        timeout = int(os.getenv("GROQ_TIMEOUT", "45"))
+    except ValueError:
+        timeout = 45
+    return GroqClient(key, model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"), timeout=timeout)

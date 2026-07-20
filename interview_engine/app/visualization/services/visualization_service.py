@@ -17,14 +17,15 @@ class VisualizationService:
         self.summary_generator = summary or SummaryGenerator()
         self.event_publisher = event_publisher or NullEventPublisher()
 
-    def create_trace(self, language: str, source_code: str, user_id: str = "system") -> ExecutionTrace:
+    def create_trace(self, language: str, source_code: str, user_id: str = "system", llm=None) -> ExecutionTrace:
         if language.lower() != "python":
             raise ValueError("Only Python tracing is supported in this phase")
         trace_id = str(uuid4())
         raw_events = self.parser.parse(self.tracer.trace(source_code))
         steps = self.timeline.build(trace_id, raw_events)
         trace = ExecutionTrace(trace_id, language, source_code, steps=steps)
-        trace.summary = self.summary_generator.generate(trace_id, source_code, steps).model_dump()
+        summary_generator = SummaryGenerator(llm) if llm is not None else self.summary_generator
+        trace.summary = summary_generator.generate(trace_id, source_code, steps).model_dump()
         self.repository.save(trace)
         metadata = {
             "trace_id": trace.id,
@@ -42,13 +43,14 @@ class VisualizationService:
         if not trace: raise KeyError("Execution trace not found")
         return trace
 
-    def explain_step(self, trace_id, step_number):
+    def explain_step(self, trace_id, step_number, llm=None):
         trace = self.get(trace_id)
         step = next((item for item in trace.steps if item.step_number == step_number), None)
         if not step: raise KeyError("Execution step not found")
         annotation = trace.annotations.get(step_number)
         if annotation is None:
-            annotation = self.explainer.explain(trace_id, step)
+            explainer = AIExplainer(llm) if llm is not None else self.explainer
+            annotation = explainer.explain(trace_id, step)
             trace.annotations[step_number] = annotation
             self.repository.save(trace)
         return step, annotation

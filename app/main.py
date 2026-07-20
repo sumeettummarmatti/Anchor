@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import structlog
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -37,12 +37,23 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class BrowserSessionMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
+        path = request.url.path
+        protected_browser_paths = path == "/" or path.startswith("/static/")
+        protected_workspace = path == "/merged/workspace" or path.startswith("/merged/workspace/")
+        if (protected_browser_paths or protected_workspace) and not request.session.get("user_id"):
+            return RedirectResponse("/merged/", status_code=307)
+        return await call_next(request)
+
+
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
     description="Backend-only coding mentor API",
 )
 app.add_middleware(RequestIDMiddleware)
+app.add_middleware(BrowserSessionMiddleware)
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.app_secret_key,

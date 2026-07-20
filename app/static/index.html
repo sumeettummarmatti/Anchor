@@ -4,85 +4,91 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mentor Lab — Phase 5 & 6</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/merged/design-system.css" />
+    <script>
+      (() => {
+        const theme = localStorage.getItem('ui_theme');
+        document.documentElement.dataset.theme = theme === 'light' || theme === 'dark' ? theme : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        if (localStorage.getItem('sidebar_collapsed') === 'true') document.documentElement.classList.add('sidebar-collapsed');
+      })();
+    </script>
+    <script src="/merged/ui-preferences.js" defer></script>
     <style>
-      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      :root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; color: #edf3ff; background: radial-gradient(circle at 15% 0%, #203b6c 0, transparent 32%), #08101e; }
-      main { width: min(1180px, calc(100% - 32px)); margin: 36px auto 72px; }
-      .eyebrow { color: #8bb5ff; font-size: .75rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+      body { margin: 0; min-height: 100vh; color: var(--text-heading); background: radial-gradient(circle at 15% 0%, rgba(20, 184, 166, .18) 0, transparent 32%), var(--bg-main); }
+      main { position: relative; width: min(1180px, calc(100% - 32px)); margin: 36px auto 72px; }
+      .page-actions { position: absolute; top: 0; right: 0; }
+      .icon-button { width: 36px; height: 36px; margin: 0; padding: 0; border: 1px solid var(--border-subtle); border-radius: 50%; background: var(--bg-card); color: var(--text-body); box-shadow: none; }
+      .eyebrow { color: var(--accent-secondary); font-size: .75rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
       h1 { margin: .25rem 0 .5rem; font-size: clamp(2rem, 5vw, 4rem); letter-spacing: -.06em; }
-      .intro { max-width: 760px; color: #b7c6e0; line-height: 1.55; }
-      .status { display: inline-flex; align-items: center; gap: 8px; color: #9ee8bc; font-size: .86rem; }
-      .dot { width: 9px; height: 9px; border-radius: 50%; background: #55d686; box-shadow: 0 0 15px #55d686; }
-      .llm-status { position: fixed; top: 16px; right: 18px; z-index: 10000; max-width: min(360px, calc(100vw - 36px)); padding: 8px 12px; border: 1px solid #49658e; border-radius: 999px; background: rgba(8, 16, 30, .94); color: #b7c6e0; box-shadow: 0 8px 24px rgba(0, 0, 0, .28); font-size: .75rem; font-weight: 800; }
-      .llm-status.ok { border-color: #55d686; color: #b8ffd0; }
-      .llm-status.unavailable { border-color: #ff8e8e; color: #ffc0c0; }
+      .intro { max-width: 760px; color: var(--text-body); line-height: 1.55; }
+      .status { display: inline-flex; align-items: center; gap: 8px; color: var(--accent-tertiary); font-size: .86rem; }
+      .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent-tertiary); box-shadow: 0 0 15px var(--accent-tertiary); }
+      .llm-status { position: fixed; top: 16px; right: 18px; z-index: 10000; max-width: min(360px, calc(100vw - 36px)); padding: 8px 12px; border: 1px solid var(--border-highlight); border-radius: 999px; background: var(--surface-sidebar); color: var(--text-body); box-shadow: var(--shadow-sm); font-size: .75rem; font-weight: 800; }
+      .llm-status.ok { border-color: var(--accent-tertiary); color: var(--accent-tertiary); }
+      .llm-status.unavailable { border-color: var(--status-error); color: var(--status-error); }
       .grid { display: grid; grid-template-columns: 1.25fr .75fr; gap: 18px; margin-top: 28px; }
-      .card { background: rgba(15, 27, 48, .91); border: 1px solid #2b4167; border-radius: 18px; padding: 20px; box-shadow: 0 16px 40px rgba(0, 0, 0, .2); }
+      .card { background: var(--surface-overlay); border: 1px solid var(--border-subtle); border-radius: 18px; padding: 20px; box-shadow: var(--shadow-lg); }
       .wide { grid-column: 1 / -1; }
       h2 { margin: 0 0 14px; font-size: 1.08rem; }
-      h3 { margin: 20px 0 8px; font-size: .9rem; color: #abc0e5; }
-      label { display: block; color: #b9c6df; font-size: .8rem; margin: 11px 0 6px; }
-      input, select, textarea { width: 100%; border: 1px solid #3a527e; border-radius: 9px; padding: 10px 11px; background: #091426; color: #fff; font: inherit; }
+      h3 { margin: 20px 0 8px; font-size: .9rem; color: var(--text-heading); }
+      label { display: block; color: var(--text-body); font-size: .8rem; margin: 11px 0 6px; }
+      input, select, textarea { width: 100%; border: 1px solid var(--border-highlight); border-radius: 9px; padding: 10px 11px; background: var(--bg-darker); color: var(--text-heading); font: inherit; }
+      input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent-primary); box-shadow: 0 0 0 4px rgba(20, 184, 166, .16); }
       textarea { min-height: 260px; resize: vertical; line-height: 1.5; font-family: "SFMono-Regular", Consolas, monospace; font-size: .86rem; }
       textarea.small { min-height: 90px; font-family: inherit; }
       .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-      button { border: 0; border-radius: 9px; padding: 10px 13px; margin: 14px 6px 0 0; background: #76a5ff; color: #071126; font-weight: 800; cursor: pointer; }
-      button.secondary { background: #293e62; color: #dce7ff; }
-      button.ghost { background: transparent; color: #9dbfff; border: 1px solid #3a527e; }
+      button { border: 0; border-radius: 9px; padding: 10px 13px; margin: 14px 6px 0 0; background: var(--gradient-primary); color: var(--bg-darker); font-weight: 800; cursor: pointer; box-shadow: var(--glow-primary); }
+      button.secondary { background: var(--bg-card); color: var(--text-heading); border: 1px solid var(--border-subtle); box-shadow: none; }
+      button.ghost { background: transparent; color: var(--accent-secondary); border: 1px solid var(--border-highlight); box-shadow: none; }
       button:hover { filter: brightness(1.12); }
-      .hint { color: #8fa4c6; font-size: .79rem; line-height: 1.5; }
-      pre { overflow: auto; min-height: 118px; max-height: 430px; margin: 0; padding: 14px; border-radius: 10px; background: #060e1b; color: #a9d1ff; font-size: .78rem; line-height: 1.5; white-space: pre-wrap; }
-      .pill { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #21385e; color: #a9c6ff; font-size: .73rem; font-weight: 700; }
+      .hint { color: var(--text-muted); font-size: .79rem; line-height: 1.5; }
+      pre { overflow: auto; min-height: 118px; max-height: 430px; margin: 0; padding: 14px; border-radius: 10px; background: var(--bg-darker); color: var(--syntax-string); font-size: .78rem; line-height: 1.5; white-space: pre-wrap; }
+      .pill { display: inline-block; padding: 4px 8px; border-radius: 999px; background: rgba(20, 184, 166, .16); color: var(--accent-secondary); font-size: .73rem; font-weight: 700; }
       .actions { display: flex; flex-wrap: wrap; align-items: center; }
-      code { color: #a9c6ff; }
-      #live-tutor-toggle.live-on { color: #b8ffd0; border-color: #55d686; }
+      code { color: var(--accent-secondary); }
+      #live-tutor-toggle.live-on { color: var(--accent-tertiary); border-color: var(--accent-tertiary); }
       #rocky { position: fixed; right: 22px; bottom: 22px; z-index: 9999; user-select: none; }
-      #rocky-character { display: flex; width: 96px; height: 82px; margin: 0; padding: 7px; flex-direction: column; align-items: center; justify-content: center; border: 2px solid #87b2ff; border-radius: 24px; background: linear-gradient(145deg, #8bb5ff, #5d83d4); color: #071126; box-shadow: 0 12px 32px rgba(0, 0, 0, .5), 0 0 24px rgba(118, 165, 255, .3); font-weight: 900; touch-action: none; }
+      #rocky-character { display: flex; width: 96px; height: 82px; margin: 0; padding: 7px; flex-direction: column; align-items: center; justify-content: center; border: 2px solid var(--accent-secondary); border-radius: 24px; background: linear-gradient(145deg, var(--accent-secondary), var(--accent-primary)); color: var(--bg-darker); box-shadow: 0 12px 32px rgba(0, 0, 0, .5), var(--glow-primary); font-weight: 900; touch-action: none; }
       .rocky-avatar { display: block; font-size: 2.2rem; line-height: 1; }
       .rocky-name { display: block; margin-top: 4px; font-size: .72rem; letter-spacing: .04em; }
       #rocky-character.running { animation: rocky-bob .7s ease-in-out infinite alternate; }
       #rocky-character.shake { animation: rocky-shake .35s ease-in-out 2; }
-      .rocky-bubble { position: relative; width: min(360px, calc(100vw - 36px)); margin-bottom: 12px; padding: 16px; border: 1px solid #6e9cec; border-radius: 18px; background: #10213d; box-shadow: 0 16px 38px rgba(0, 0, 0, .5); }
-      .rocky-bubble::after { position: absolute; right: 30px; bottom: -11px; width: 20px; height: 20px; border-right: 1px solid #6e9cec; border-bottom: 1px solid #6e9cec; background: #10213d; content: ""; transform: rotate(45deg); }
-      .rocky-bubble.thinking { border-color: #76a5ff; }
+      .rocky-bubble { position: relative; width: min(360px, calc(100vw - 36px)); margin-bottom: 12px; padding: 16px; border: 1px solid rgba(45, 212, 191, .55); border-radius: 18px; background: var(--bg-card); box-shadow: var(--shadow-lg); }
+      .rocky-bubble::after { position: absolute; right: 30px; bottom: -11px; width: 20px; height: 20px; border-right: 1px solid rgba(45, 212, 191, .55); border-bottom: 1px solid rgba(45, 212, 191, .55); background: var(--bg-card); content: ""; transform: rotate(45deg); }
+      .rocky-bubble.thinking { border-color: var(--accent-primary); }
       .rocky-bubble[hidden] { display: none; }
-      .rocky-bubble p { margin: 0; color: #edf3ff; line-height: 1.45; }
+      .rocky-bubble p { margin: 0; color: var(--text-heading); line-height: 1.45; }
       .rocky-dots { display: inline-block; opacity: .65; animation: rocky-bob .5s ease-in-out infinite alternate; }
-      .rocky-meta { display: block; margin-top: 8px; color: #9dbfff; font-size: .72rem; }
+      .rocky-meta { display: block; margin-top: 8px; color: var(--text-muted); font-size: .72rem; }
       .rocky-bubble button { margin-top: 10px; margin-right: 4px; padding: 7px 9px; font-size: .73rem; }
       .rocky-actions { display: flex; flex-wrap: wrap; gap: 4px; }
       .rocky-actions button { margin-right: 0; }
-      .rocky-actions .agent-on { border-color: #55d686; color: #b8ffd0; background: #173d35; }
+      .rocky-actions .agent-on { border-color: var(--accent-tertiary); color: var(--accent-tertiary); background: rgba(52, 211, 153, .14); }
       .rocky-reply { display: flex; gap: 6px; margin-top: 10px; }
       .rocky-reply input { min-width: 0; margin: 0; padding: 8px 9px; font-size: .78rem; }
       .rocky-reply button { flex: 0 0 auto; margin: 0; }
       @keyframes rocky-bob { from { transform: translateY(0); } to { transform: translateY(-6px); } }
       @keyframes rocky-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
-      .stuck-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 10001; background: #55d686; color: #071126; padding: 12px 24px; display: flex; justify-content: center; gap: 16px; align-items: center; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-      .stuck-banner button { margin: 0; background: #071126; color: #55d686; padding: 6px 12px; font-weight: 800; border: none; border-radius: 6px; cursor: pointer; }
+      .stuck-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 10001; background: var(--accent-tertiary); color: var(--bg-darker); padding: 12px 24px; display: flex; justify-content: center; gap: 16px; align-items: center; font-weight: bold; box-shadow: var(--shadow-sm); }
+      .stuck-banner button { margin: 0; background: var(--bg-darker); color: var(--accent-tertiary); padding: 6px 12px; font-weight: 800; border: none; border-radius: 6px; cursor: pointer; }
       .stuck-banner[hidden] { display: none; }
       @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } .wide { grid-column: auto; } .row { grid-template-columns: 1fr; } }
-      body { background: radial-gradient(circle at 50% -8%, rgba(124, 58, 237, .28), transparent 36%), radial-gradient(circle at 0% 100%, rgba(192, 38, 211, .13), transparent 32%), #05050d; }
-      .eyebrow, .pill, code { color: #d8ccff; }
-      .card { background: linear-gradient(145deg, rgba(20, 17, 41, .94), rgba(11, 10, 26, .97)); border-color: rgba(176, 144, 255, .26); box-shadow: 0 16px 42px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .03); }
-      input, select, textarea { border-color: rgba(176, 144, 255, .34); background: rgba(6, 6, 18, .88); }
-      input:focus, select:focus, textarea:focus { outline: 1px solid #a78bfa; box-shadow: 0 0 0 4px rgba(139, 92, 246, .16); }
-      pre { background: rgba(5, 5, 15, .93); color: #d8ccff; }
-      button { color: #fff; background: linear-gradient(135deg, #7c3aed, #c026d3); box-shadow: 0 8px 20px rgba(124, 58, 237, .28); }
-      button.secondary, button.ghost { color: #ede9fe; border: 1px solid rgba(196, 181, 253, .25); background: rgba(255, 255, 255, .07); box-shadow: none; }
-      .pill { background: rgba(124, 58, 237, .3); }
-      .llm-status, .rocky-bubble { border-color: rgba(176, 144, 255, .38); background: rgba(12, 10, 29, .95); }
     </style>
   </head>
   <body>
     <div id="stuck-banner" class="stuck-banner" hidden>
       <span>Are you stuck? Let Rocky help you!</span>
       <button type="button" onclick="document.getElementById('rocky-character').click(); document.getElementById('stuck-banner').hidden = true;">Click on Rocky and communicate</button>
-      <button type="button" class="ghost" style="border: 1px solid #071126; background: transparent; color: #071126;" onclick="document.getElementById('stuck-banner').hidden = true;">Dismiss</button>
+      <button type="button" class="ghost" style="border: 1px solid var(--bg-darker); background: transparent; color: var(--bg-darker);" onclick="document.getElementById('stuck-banner').hidden = true;">Dismiss</button>
     </div>
     <div id="llm-status" class="llm-status" role="status" aria-live="polite">LLM: checking…</div>
     <main>
+      <div class="page-actions"><button type="button" class="icon-button" data-theme-toggle aria-label="Use light theme" title="Use light theme">☀</button></div>
       <div class="eyebrow">Local API demo · phases 5 & 6</div>
       <h1>Mentor Lab.</h1>
       <p class="intro">Meet your coding mentor in a small browser workspace for running code, inspecting Ruff diagnostics, and getting Socratic guidance from your local model.</p>
@@ -90,7 +96,7 @@
 
       <section class="grid">
         <form class="card" id="auth-form">
-          <h2>1. Sign in</h2>
+          <h2>Sign in</h2>
           <label for="display-name">Display name (registration only)</label>
           <input id="display-name" value="Ada Learner" />
           <label for="email">Email</label>
@@ -106,7 +112,7 @@
         </form>
 
         <form class="card" id="session-form">
-          <h2>2. Workspace <span class="pill">session</span></h2>
+          <h2>Workspace <span class="pill">session</span></h2>
           <label for="session-id">Learning session ID</label>
           <input id="session-id" placeholder="Create one below" />
           <button type="submit">Create scratch session</button>
@@ -118,7 +124,7 @@
         <section class="card wide">
           <div class="row">
             <div>
-              <h2>3. Code workspace</h2>
+              <h2>Code workspace</h2>
               <label for="language">Language</label>
               <select id="language"><option value="python">Python</option><option value="javascript">JavaScript</option></select>
             </div>
@@ -142,7 +148,7 @@ print(greet("learner"))</textarea>
         </section>
 
         <section class="card">
-          <h2>4. Mentor chat</h2>
+          <h2>Mentor chat</h2>
           <label for="chat-message">Question</label>
           <textarea class="small" id="chat-message">What should I improve in this code?</textarea>
           <button type="button" id="chat">Ask mentor</button>
@@ -155,7 +161,7 @@ print(greet("learner"))</textarea>
         </section>
 
         <section class="card">
-          <h2>5. Progressive hints</h2>
+          <h2>Progressive hints</h2>
           <p class="hint">Each click advances one level. Skipping a level returns a conflict response.</p>
           <button type="button" id="hint">Get next hint</button>
           <p id="hint-level" class="pill">Next level: 1</p>
@@ -222,6 +228,7 @@ print(greet("learner"))</textarea>
         if (!token()) throw { detail: 'Log in first.' };
         return { Authorization: `Bearer ${token()}` };
       };
+      const llmAuthHeaders = () => ({ ...authHeaders(), ...(localStorage.getItem('mentor_groq_api_key') ? { 'X-Groq-Api-Key': localStorage.getItem('mentor_groq_api_key') } : {}) });
       const codePayload = () => ({ language: $('language').value, code: $('code').value });
 
       $('register').addEventListener('click', async () => {
@@ -236,7 +243,8 @@ print(greet("learner"))</textarea>
         try {
           const tokens = await request('/auth/login', { method: 'POST', body: JSON.stringify({ email: $('email').value, password: $('password').value }) });
           localStorage.setItem('mentor_access_token', tokens.access_token);
-          $('auth-state').textContent = 'Logged in. Access token stored locally.';
+          localStorage.setItem('mentor_refresh_token', tokens.refresh_token);
+          $('auth-state').textContent = 'Logged in. Access and refresh tokens stored locally.';
           show({ message: 'Logged in', token_type: tokens.token_type });
         } catch (error) { showError(error); }
       });
@@ -295,15 +303,15 @@ print(greet("learner"))</textarea>
       $('chat').addEventListener('click', async () => {
         try {
           const sessionId = $('session-id').value || null;
-          showMentor(await request('/mentor/chat', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, message: $('chat-message').value }) }));
+          showMentor(await request('/mentor/chat', { method: 'POST', headers: llmAuthHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, message: $('chat-message').value }) }));
         } catch (error) { showError(error); }
       });
       $('explain').addEventListener('click', async () => {
-        try { showMentor(await request('/mentor/explain-error', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: $('session-id').value || null, error: $('runtime-error').value }) })); } catch (error) { showError(error); }
+        try { showMentor(await request('/mentor/explain-error', { method: 'POST', headers: llmAuthHeaders(), body: JSON.stringify({ ...codePayload(), session_id: $('session-id').value || null, error: $('runtime-error').value }) })); } catch (error) { showError(error); }
       });
       async function requestProgressiveHint() {
         const sessionId = await ensureSession();
-        const response = await request('/mentor/hint', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, request: 'Give me the next useful hint.' }) });
+        const response = await request('/mentor/hint', { method: 'POST', headers: llmAuthHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, request: 'Give me the next useful hint.' }) });
         $('hint-level').textContent = `Completed level: ${response.level} · next: ${Math.min(response.level + 1, 5)}`;
         $('hint-output').textContent = response.message;
         showMentor(response);
@@ -391,7 +399,7 @@ print(greet("learner"))</textarea>
           if (!liveModeActive || controller.signal.aborted) return;
           const body = await request('/mentor/live-nudge', {
             method: 'POST',
-            headers: authHeaders(),
+            headers: llmAuthHeaders(),
             signal: controller.signal,
             body: JSON.stringify({ ...codePayload(), session_id: sessionId, problem_id: null, client_detected_signal: `${signal}; typing_wpm=${estimateTypingSpeedWpm().toFixed(1)}` }),
           });
@@ -468,7 +476,7 @@ print(greet("learner"))</textarea>
           const sessionId = $('session-id').value || null;
           const response = await request('/mentor/chat', {
             method: 'POST',
-            headers: authHeaders(),
+            headers: llmAuthHeaders(),
             body: JSON.stringify({ ...codePayload(), session_id: sessionId, message: prompt }),
           });
           rockyConversation.push({ role: 'learner', content: message });

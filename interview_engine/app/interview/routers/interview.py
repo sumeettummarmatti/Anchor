@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from ...core.security import get_authenticated_user
+from ...core.llm import request_groq_client
 from ..schemas.interview import InterviewCreate, AnswerRequest, InterviewResponse, InterviewView
 from ..schemas.evaluation import AnswerResponse
 from ..schemas.report import InterviewReport
@@ -14,23 +15,23 @@ def create_router(service):
         return item
 
     @router.post("/start", response_model=InterviewResponse)
-    def start(request: InterviewCreate, current_user: str = Depends(get_authenticated_user)):
-        if current_user != request.context.user_id:
+    def start(payload: InterviewCreate, request: Request, current_user: str = Depends(get_authenticated_user)):
+        if current_user != payload.context.user_id:
             raise HTTPException(403, "Authenticated user does not own this submission")
-        interview = service.start(request)
+        interview = service.start(payload, llm=request_groq_client(request))
         return InterviewResponse(interview_id=interview.id, first_question=interview.current_question)
 
     @router.post("/{interview_id}/answer", response_model=AnswerResponse)
-    def answer(interview_id: str, request: AnswerRequest, current_user: str = Depends(get_authenticated_user)):
+    def answer(interview_id: str, payload: AnswerRequest, request: Request, current_user: str = Depends(get_authenticated_user)):
         owner(interview_id, current_user)
-        try: evaluation, question = service.answer(interview_id, request.answer)
+        try: evaluation, question = service.answer(interview_id, payload.answer, llm=request_groq_client(request))
         except ValueError as exc: raise HTTPException(409, str(exc))
         return AnswerResponse(evaluation=evaluation, next_question=question)
 
     @router.post("/{interview_id}/finish", response_model=InterviewReport)
-    def finish(interview_id: str, current_user: str = Depends(get_authenticated_user)):
+    def finish(interview_id: str, request: Request, current_user: str = Depends(get_authenticated_user)):
         owner(interview_id, current_user)
-        try: return service.finish(interview_id)
+        try: return service.finish(interview_id, llm=request_groq_client(request))
         except ValueError as exc: raise HTTPException(409, str(exc))
 
     @router.get("/{interview_id}", response_model=InterviewView)

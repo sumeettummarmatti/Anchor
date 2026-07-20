@@ -77,9 +77,15 @@ class PromptContext:
 class AIService:
     """Executes a template-built prompt through an OpenAI-compatible provider."""
 
-    def __init__(self, settings: Settings, client: AsyncOpenAI | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        client: AsyncOpenAI | None = None,
+        groq_api_key: str | None = None,
+    ) -> None:
         self.settings = settings
         self._client = client
+        self.groq_api_key = groq_api_key
 
     def connection(self, provider: LLMProvider | None = None) -> LLMConnection:
         provider = provider or self.settings.llm_provider
@@ -107,7 +113,7 @@ class AIService:
                     LLMProvider.GROQ,
                     self.settings.groq_model,
                     "https://api.groq.com/openai/v1",
-                    self.settings.groq_api_key,
+                    self.groq_api_key or self.settings.groq_api_key,
                 )
             case LLMProvider.HUGGINGFACE:
                 return LLMConnection(
@@ -127,6 +133,8 @@ class AIService:
 
     def provider_order(self) -> tuple[LLMProvider, ...]:
         """Return providers to try, with local fallback for Ollama/auto."""
+        if self.groq_api_key:
+            return (LLMProvider.GROQ,)
         configured = self.settings.llm_provider
         if configured is LLMProvider.AUTO:
             return (LLMProvider.OLLAMA, LLMProvider.LMSTUDIO)
@@ -160,7 +168,7 @@ class AIService:
         return False, None, None, "; ".join(failures) or "No LLM provider is configured."
 
     def _client_for(self, connection: LLMConnection, provider: LLMProvider) -> AsyncOpenAI:
-        if self._client is not None and provider is self.settings.llm_provider:
+        if self._client is not None and not self.groq_api_key and provider is self.settings.llm_provider:
             return self._client
         return AsyncOpenAI(
             api_key=connection.api_key or "local",

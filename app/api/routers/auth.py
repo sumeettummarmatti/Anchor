@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
+from app.core.security import decode_jwt
 from app.db.session import get_db_session
 from app.schemas.auth import (
     LoginRequest,
@@ -16,6 +17,11 @@ from app.services.auth_service import AuthService
 from app.services.oauth_service import OAuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _establish_session(request: Request, tokens: TokenResponse, settings: Settings) -> None:
+    claims = decode_jwt(tokens.access_token, settings, "access")
+    request.session["user_id"] = str(claims["sub"])
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -33,28 +39,38 @@ async def register(
 @router.post("/login", response_model=TokenResponse)
 async def login(
     payload: LoginRequest,
+    request: Request,
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> TokenResponse:
-    return await AuthService(session, settings).login(payload.email, payload.password)
+    tokens = await AuthService(session, settings).login(payload.email, payload.password)
+    _establish_session(request, tokens, settings)
+    return tokens
 
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(
     payload: RefreshRequest,
+    request: Request,
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> TokenResponse:
-    return await AuthService(session, settings).refresh(payload.refresh_token)
+    tokens = await AuthService(session, settings).refresh(payload.refresh_token)
+    _establish_session(request, tokens, settings)
+    return tokens
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     payload: RefreshRequest,
+    request: Request,
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> None:
-    await AuthService(session, settings).logout(payload.refresh_token)
+    try:
+        await AuthService(session, settings).logout(payload.refresh_token)
+    finally:
+        request.session.clear()
 
 
 @router.get("/oauth/{provider}/login", summary="Begin Google or GitHub OAuth")
@@ -72,4 +88,6 @@ async def oauth_callback(
     oauth_id, email, display_name = await OAuthService(settings).fetch_identity(provider, request)
     auth_service = AuthService(session, settings)
     user = await auth_service.get_or_create_oauth_user(provider, oauth_id, email, display_name)
-    return await auth_service.issue_oauth_tokens(user)
+    tokens = await auth_service.issue_oauth_tokens(user)
+    _establish_session(request, tokens, settings)
+    return tokens

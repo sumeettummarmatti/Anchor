@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from ...core.security import get_authenticated_user
+from ...core.llm import request_groq_client
 from ..schemas.visualization import TraceCreate, TraceCreated, TraceSummary
 from ..schemas.execution_step import ExecutionStepResponse
 from ..schemas.trace_response import AnnotationResponse, StepExplanationResponse, TraceResponse
@@ -12,8 +13,8 @@ def create_router(service):
     auth = Depends(get_authenticated_user)
 
     @router.post("/trace", response_model=TraceCreated)
-    def create_trace(request: TraceCreate, current_user: str = auth):
-        try: trace = service.create_trace(request.language, request.source_code, user_id=current_user)
+    def create_trace(payload: TraceCreate, request: Request, current_user: str = auth):
+        try: trace = service.create_trace(payload.language, payload.source_code, user_id=current_user, llm=request_groq_client(request))
         except (ValueError, SyntaxError) as exc: raise HTTPException(400, str(exc))
         return TraceCreated(trace_id=trace.id)
 
@@ -37,8 +38,8 @@ def create_router(service):
         return TraceSummary(**trace.summary)
 
     @router.get("/{trace_id}/steps/{step_number}", response_model=StepExplanationResponse)
-    def explain_step(trace_id: str, step_number: int, current_user: str = auth):
-        try: step, annotation = service.explain_step(trace_id, step_number)
+    def explain_step(trace_id: str, step_number: int, request: Request, current_user: str = auth):
+        try: step, annotation = service.explain_step(trace_id, step_number, llm=request_groq_client(request))
         except KeyError as exc: raise HTTPException(404, str(exc))
         return StepExplanationResponse(step=step_response(step), annotation=AnnotationResponse(trace_id=annotation.trace_id, step_number=annotation.step_number, explanation=annotation.explanation, detected_concept=annotation.detected_concept, difficulty=annotation.difficulty, provider=annotation.provider))
     return router

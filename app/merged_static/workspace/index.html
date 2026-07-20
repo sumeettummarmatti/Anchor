@@ -4,45 +4,82 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mentor Workspace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/merged/design-system.css" />
+    <script>
+      (() => {
+        const theme = localStorage.getItem('ui_theme');
+        document.documentElement.dataset.theme = theme === 'light' || theme === 'dark' ? theme : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        if (localStorage.getItem('sidebar_collapsed') === 'true') document.documentElement.classList.add('sidebar-collapsed');
+      })();
+    </script>
+    <script src="/merged/ui-preferences.js" defer></script>
     <style>
-      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
       * { box-sizing: border-box; }
-      body { min-height: 100vh; margin: 0; color: #edf3ff; background: #08101e; }
-      header { min-height: 74px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 13px clamp(16px, 4vw, 42px); border-bottom: 1px solid #2b4167; background: rgba(8, 16, 30, .96); }
-      .brand { font-size: 1.05rem; font-weight: 850; letter-spacing: -.025em; }
-      .brand span { color: #8bb5ff; }
-      nav { display: flex; align-self: stretch; gap: 6px; }
-      button { border: 0; border-radius: 8px; padding: 9px 13px; background: transparent; color: #b7c6e0; font: inherit; font-weight: 750; cursor: pointer; }
-      button[aria-selected="true"] { background: #293e62; color: #fff; }
-      button.logout { border: 1px solid #3a527e; }
-      main { min-height: calc(100vh - 74px); }
-      .panel { display: none; height: calc(100vh - 74px); }
+      body { min-height: 100vh; margin: 0; color: var(--text-heading); background: radial-gradient(circle at 30% 0%, rgba(20, 184, 166, .16), transparent 35%), var(--bg-main); }
+      .app-shell { min-height: 100vh; display: flex; }
+      .sidebar { width: 248px; min-height: 100vh; flex: 0 0 248px; display: flex; flex-direction: column; padding: 28px 18px 18px; border-right: 1px solid var(--border-subtle); background: var(--surface-sidebar); box-shadow: 12px 0 36px rgba(0, 0, 0, .18); transition: width .2s ease, flex-basis .2s ease, padding .2s ease; }
+      .brand { padding: 0 12px; font-size: 1.05rem; font-weight: 850; letter-spacing: -.025em; }
+      .brand span { color: var(--accent-secondary); }
+      nav { display: flex; flex-direction: column; gap: 8px; margin-top: 44px; }
+      nav button { width: 100%; display: flex; align-items: center; justify-content: flex-start; gap: 12px; border: 1px solid transparent; border-radius: var(--radius-md); padding: 12px; background: transparent; color: var(--text-body); font: inherit; font-weight: 750; cursor: pointer; text-align: left; }
+      nav button:hover { color: var(--text-heading); background: rgba(255, 255, 255, .04); }
+      .nav-icon { width: 20px; color: var(--text-muted); font-size: 1.1rem; text-align: center; }
+      button[aria-selected="true"] { border-color: rgba(20, 184, 166, .28); background: linear-gradient(135deg, rgba(20, 184, 166, .22), rgba(52, 211, 153, .12)); color: var(--text-heading); box-shadow: var(--glow-primary); }
+      button[aria-selected="true"] .nav-icon { color: var(--accent-secondary); }
+      .sidebar-bottom { margin-top: auto; padding: 16px 12px 0; border-top: 1px solid var(--border-subtle); }
+      .sidebar-controls { display: flex; gap: 8px; margin-bottom: 12px; }
+      .sidebar-control { flex: 1; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 9px 10px; background: transparent; color: var(--text-body); font: inherit; cursor: pointer; }
+      .sidebar-control:hover { border-color: var(--accent-primary); color: var(--text-heading); }
+      button.logout { width: 100%; border: 1px solid var(--border-highlight); border-radius: var(--radius-md); padding: 10px 13px; background: rgba(255, 255, 255, .04); color: var(--text-body); font: inherit; font-weight: 750; cursor: pointer; }
+      button.logout:hover { border-color: var(--accent-primary); color: var(--text-heading); }
+      html.sidebar-collapsed .sidebar { width: 78px; flex-basis: 78px; padding-left: 10px; padding-right: 10px; }
+      html.sidebar-collapsed .brand { padding-left: 0; padding-right: 0; text-align: center; font-size: 0; }
+      html.sidebar-collapsed .brand span, html.sidebar-collapsed nav button > span:not(.nav-icon), html.sidebar-collapsed .sidebar-control > span:not(.control-icon) { display: none; }
+      html.sidebar-collapsed nav button { justify-content: center; padding-left: 8px; padding-right: 8px; }
+      html.sidebar-collapsed .sidebar-controls { flex-direction: column; }
+      main { flex: 1; min-width: 0; min-height: 100vh; }
+      .panel { display: none; height: 100vh; }
       .panel.active { display: block; }
-      iframe { display: block; width: 100%; height: 100%; border: 0; background: #08101e; }
-      @media (max-width: 600px) { header { align-items: flex-start; flex-wrap: wrap; } nav { order: 3; width: 100%; height: 42px; } nav button { flex: 1; } .panel { height: calc(100vh - 129px); } }
-      body { background: radial-gradient(circle at 50% -20%, rgba(124, 58, 237, .26), transparent 42%), #05050d; }
-      header { border-color: rgba(176, 144, 255, .2); background: rgba(7, 6, 19, .92); box-shadow: 0 1px 28px rgba(0, 0, 0, .32); }
-      .brand span { color: #c4b5fd; }
-      nav button { border: 1px solid transparent; color: #c9c4dd; }
-      button[aria-selected="true"] { border-color: rgba(196, 181, 253, .26); background: linear-gradient(135deg, rgba(124, 58, 237, .78), rgba(192, 38, 211, .7)); color: #fff; box-shadow: 0 8px 20px rgba(124, 58, 237, .22); }
-      button.logout { border-color: rgba(196, 181, 253, .3); color: #ede9fe; background: rgba(255, 255, 255, .05); }
+      iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--bg-main); }
+      @media (max-width: 720px) {
+        .app-shell { flex-direction: column; }
+        .sidebar { width: 100%; min-height: auto; flex: none; padding: 18px 16px 14px; border-right: 0; border-bottom: 1px solid var(--border-subtle); }
+        .brand { padding: 0 4px; }
+        nav { flex-direction: row; gap: 6px; margin-top: 18px; overflow-x: auto; }
+        nav button { flex: 1; min-width: max-content; justify-content: center; padding: 10px; }
+        .sidebar-bottom { display: flex; justify-content: flex-end; margin-top: 12px; padding: 12px 0 0; }
+        button.logout { width: auto; }
+        main { height: calc(100vh - 184px); min-height: 0; }
+        .panel { height: 100%; }
+      }
     </style>
   </head>
   <body>
-    <header>
-      <div class="brand">Mentor <span>Workspace</span></div>
+    <div class="app-shell">
+      <header class="sidebar">
+        <div class="brand">Mentor <span>Workspace</span></div>
       <nav role="tablist" aria-label="Workspace experiences">
-        <button type="button" role="tab" id="mentor-tab" aria-controls="mentor-panel" aria-selected="true">Coding Mentor</button>
-        <button type="button" role="tab" id="execution-tab" aria-controls="execution-panel" aria-selected="false">Execution Lab</button>
-        <button type="button" role="tab" id="interview-tab" aria-controls="interview-panel" aria-selected="false">Interview Engine</button>
-      </nav>
-      <button type="button" class="logout" id="logout">Log out</button>
-    </header>
-    <main>
-      <section class="panel active" id="mentor-panel" role="tabpanel" aria-labelledby="mentor-tab"><iframe id="mentor-frame" title="Coding Mentor" src="/demo/"></iframe></section>
-      <section class="panel" id="execution-panel" role="tabpanel" aria-labelledby="execution-tab"><iframe id="execution-frame" title="Execution Lab" src="/?view=lab&merged=1"></iframe></section>
-      <section class="panel" id="interview-panel" role="tabpanel" aria-labelledby="interview-tab"><iframe title="Interview Engine" src="/?view=interview&merged=1"></iframe></section>
-    </main>
+        <button type="button" role="tab" id="mentor-tab" aria-controls="mentor-panel" aria-selected="true"><span class="nav-icon" aria-hidden="true">⌘</span><span>Coding Mentor</span></button>
+        <button type="button" role="tab" id="execution-tab" aria-controls="execution-panel" aria-selected="false"><span class="nav-icon" aria-hidden="true">◈</span><span>Execution Lab</span></button>
+        <button type="button" role="tab" id="interview-tab" aria-controls="interview-panel" aria-selected="false"><span class="nav-icon" aria-hidden="true">✦</span><span>Interview Engine</span></button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="sidebar-controls">
+            <button type="button" class="sidebar-control" data-sidebar-toggle aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar"><span class="control-icon" aria-hidden="true">‹</span><span data-sidebar-label>Collapse</span></button>
+            <button type="button" class="sidebar-control" data-theme-toggle aria-label="Use light theme" title="Use light theme">☀</button>
+          </div>
+          <button type="button" class="logout" id="logout">Log out</button>
+        </div>
+      </header>
+      <main>
+        <section class="panel active" id="mentor-panel" role="tabpanel" aria-labelledby="mentor-tab"><iframe id="mentor-frame" title="Coding Mentor" src="/demo/"></iframe></section>
+        <section class="panel" id="execution-panel" role="tabpanel" aria-labelledby="execution-tab"><iframe id="execution-frame" title="Execution Lab" src="/?view=lab&merged=1"></iframe></section>
+        <section class="panel" id="interview-panel" role="tabpanel" aria-labelledby="interview-tab"><iframe title="Interview Engine" src="/?view=interview&merged=1"></iframe></section>
+      </main>
+    </div>
     <script>
       const accessToken = localStorage.getItem('mentor_access_token');
       if (!accessToken) location.replace('/merged/');
@@ -54,10 +91,17 @@
         panels.forEach((panel) => panel.classList.toggle('active', panel.id === tab.getAttribute('aria-controls')));
       };
       tabs.forEach((tab) => tab.addEventListener('click', () => selectTab(tab)));
-      document.getElementById('logout').addEventListener('click', () => {
-        localStorage.removeItem('mentor_access_token');
-        localStorage.removeItem('mentor_workspace_session_id');
-        location.assign('/merged/');
+      document.getElementById('logout').addEventListener('click', async () => {
+        const refreshToken = localStorage.getItem('mentor_refresh_token');
+        try {
+          if (refreshToken) await fetch('/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: refreshToken }) });
+        } finally {
+          localStorage.removeItem('mentor_access_token');
+          localStorage.removeItem('mentor_refresh_token');
+          localStorage.removeItem('mentor_workspace_session_id');
+          localStorage.removeItem('mentor_groq_api_key');
+          location.assign('/merged/');
+        }
       });
       const createLearningSession = async () => {
         const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` };

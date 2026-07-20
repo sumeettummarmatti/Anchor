@@ -1,13 +1,15 @@
 /* design-system.css */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 :root {
+  color-scheme: dark;
   /* Color Palette */
-  --bg-main: #0A0A0F;
-  --bg-darker: #08080C;
+  --bg-main: #070C0D;
+  --bg-darker: #05080A;
   --bg-card: #131318;
   --bg-card-hover: #16161C;
   --bg-panel: #0D0D12;
+  --surface-overlay: rgba(19, 19, 24, .94);
+  --surface-sidebar: rgba(5, 8, 10, .9);
+  --editor-bg: #0C1219;
   
   --border-subtle: rgba(255, 255, 255, 0.08);
   --border-highlight: rgba(255, 255, 255, 0.15);
@@ -16,9 +18,9 @@
   --text-body: #9A9AA5;
   --text-muted: #71717A;
   
-  --accent-primary: #7C3AED;
-  --accent-secondary: #EC4899;
-  --accent-tertiary: #3B82F6;
+  --accent-primary: #14B8A6;
+  --accent-secondary: #2DD4BF;
+  --accent-tertiary: #34D399;
   
   --gradient-primary: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-tertiary));
   
@@ -37,7 +39,7 @@
   /* Shadows */
   --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.2);
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.4);
-  --glow-primary: 0 0 24px rgba(124, 58, 237, 0.25);
+  --glow-primary: 0 0 24px rgba(20, 184, 166, 0.25);
   
   /* Radii */
   --radius-sm: 6px;
@@ -48,6 +50,32 @@
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg-main: #F3FAF8;
+  --bg-darker: #E7F4F1;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F0FBF8;
+  --bg-panel: #ECF7F5;
+  --surface-overlay: rgba(255, 255, 255, .94);
+  --surface-sidebar: rgba(236, 247, 245, .94);
+  --editor-bg: #F7FCFB;
+  --border-subtle: rgba(10, 66, 60, .14);
+  --border-highlight: rgba(10, 66, 60, .24);
+  --text-heading: #0B2925;
+  --text-body: #355B56;
+  --text-muted: #65807B;
+  --status-success: #159A6C;
+  --status-error: #C83F4B;
+  --status-warning: #B7791F;
+  --syntax-keyword: #B4235A;
+  --syntax-function: #0F7490;
+  --syntax-string: #147D64;
+  --syntax-comment: #66827B;
+  --syntax-number: #0F7490;
+  --glow-primary: 0 0 24px rgba(20, 184, 166, .2);
 }
 
 * {
@@ -135,7 +163,7 @@ input, select, textarea {
 
 input:focus, select:focus, textarea:focus {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+  box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.2);
 }
 
 textarea {
@@ -220,11 +248,11 @@ button:disabled {
   align-items: center;
   padding: 0.25rem 0.75rem;
   border-radius: var(--radius-pill);
-  background: rgba(124, 58, 237, 0.1);
+  background: rgba(20, 184, 166, 0.1);
   color: var(--accent-primary);
   font-size: 0.75rem;
   font-weight: 600;
-  border: 1px solid rgba(124, 58, 237, 0.2);
+  border: 1px solid rgba(20, 184, 166, 0.2);
 }
 
 /* Custom Scrollbar */

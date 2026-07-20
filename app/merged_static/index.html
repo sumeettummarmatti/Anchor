@@ -4,35 +4,44 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mentor Workspace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/merged/design-system.css" />
+    <script>
+      (() => {
+        const theme = localStorage.getItem('ui_theme');
+        document.documentElement.dataset.theme = theme === 'light' || theme === 'dark' ? theme : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        if (localStorage.getItem('sidebar_collapsed') === 'true') document.documentElement.classList.add('sidebar-collapsed');
+      })();
+    </script>
+    <script src="/merged/ui-preferences.js" defer></script>
     <style>
-      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
       * { box-sizing: border-box; }
-      body { min-height: 100vh; margin: 0; display: grid; place-items: center; color: #edf3ff; background: radial-gradient(circle at 14% 8%, #263f70, transparent 34%), #08101e; }
-      main { width: min(460px, calc(100% - 32px)); padding: 32px; border: 1px solid #2b4167; border-radius: 20px; background: rgba(15, 27, 48, .94); box-shadow: 0 22px 60px rgba(0, 0, 0, .34); }
-      .eyebrow { color: #8bb5ff; font-size: .75rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; color: var(--text-heading); background: radial-gradient(circle at 14% 8%, rgba(20, 184, 166, .18), transparent 34%), var(--bg-main); }
+      main { position: relative; width: min(460px, calc(100% - 32px)); padding: 32px; border: 1px solid var(--border-highlight); border-radius: 20px; background: var(--surface-overlay); box-shadow: var(--shadow-lg), var(--glow-primary); }
+      .page-actions { position: absolute; top: 18px; right: 18px; }
+      .icon-button { width: 34px; height: 34px; margin: 0; padding: 0; border: 1px solid var(--border-subtle); border-radius: 50%; background: var(--bg-card); color: var(--text-body); box-shadow: none; }
+      .eyebrow { color: var(--accent-secondary); font-size: .75rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
       h1 { margin: .35rem 0 .7rem; font-size: clamp(2rem, 8vw, 3rem); letter-spacing: -.055em; }
-      p { color: #b7c6e0; line-height: 1.5; }
-      label { display: block; margin: 14px 0 6px; color: #b9c6df; font-size: .82rem; }
-      input { width: 100%; padding: 11px 12px; border: 1px solid #3a527e; border-radius: 9px; background: #091426; color: #fff; font: inherit; }
+      p { color: var(--text-body); line-height: 1.5; }
+      label { display: block; margin: 14px 0 6px; color: var(--text-body); font-size: .82rem; }
+      input { width: 100%; padding: 11px 12px; border: 1px solid var(--border-highlight); border-radius: 9px; background: var(--bg-darker); color: var(--text-heading); font: inherit; }
+      input:focus { outline: 1px solid var(--accent-primary); box-shadow: 0 0 0 4px rgba(20, 184, 166, .18); }
       .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
-      button { border: 0; border-radius: 9px; padding: 11px 14px; background: #76a5ff; color: #071126; font: inherit; font-weight: 800; cursor: pointer; }
-      button.secondary { background: #293e62; color: #dce7ff; }
+      button { border: 0; border-radius: 9px; padding: 11px 14px; background: var(--gradient-primary); color: var(--bg-darker); font: inherit; font-weight: 800; cursor: pointer; box-shadow: var(--glow-primary); }
+      button.secondary { background: var(--bg-card); color: var(--text-heading); border: 1px solid var(--border-subtle); box-shadow: none; }
       button:disabled { opacity: .65; cursor: wait; }
       #status { min-height: 1.4em; margin: 15px 0 0; font-size: .84rem; }
-      #status.error { color: #ffb2b2; }
+      #status.error { color: var(--status-error); }
       .note { font-size: .78rem; }
-      body { background: radial-gradient(circle at 50% 0%, rgba(112, 66, 196, .28), transparent 38%), radial-gradient(circle at 0% 100%, rgba(185, 107, 180, .16), transparent 38%), #05050d; }
-      main { border-color: rgba(176, 144, 255, .26); background: linear-gradient(145deg, rgba(20, 17, 41, .96), rgba(10, 9, 24, .98)); box-shadow: 0 24px 70px rgba(0, 0, 0, .52), 0 0 50px rgba(123, 85, 232, .13); }
-      .eyebrow { color: #c4b5fd; }
-      p, label { color: #c9c4dd; }
-      input { border-color: rgba(174, 148, 244, .35); background: rgba(6, 6, 18, .88); }
-      input:focus { outline: 1px solid #a78bfa; box-shadow: 0 0 0 4px rgba(139, 92, 246, .18); }
-      button { color: #fff; background: linear-gradient(135deg, #7c3aed, #c026d3); box-shadow: 0 8px 22px rgba(139, 92, 246, .3); }
-      button.secondary { background: rgba(255, 255, 255, .07); border: 1px solid rgba(196, 181, 253, .22); color: #ede9fe; box-shadow: none; }
+      #auth-form[hidden], #groq-key-step[hidden] { display: none; }
+      .key-copy { margin-top: 0; }
     </style>
   </head>
   <body>
     <main>
+      <div class="page-actions"><button type="button" class="icon-button" data-theme-toggle aria-label="Use light theme" title="Use light theme">☀</button></div>
       <div class="eyebrow">Unified learning workspace</div>
       <h1>Welcome back.</h1>
       <p>Create an account or sign in to open your coding mentor and interview engine in one place.</p>
@@ -48,13 +57,27 @@
           <button type="submit" class="secondary">Log in</button>
         </div>
       </form>
+      <section id="groq-key-step" hidden>
+        <div class="eyebrow">Optional personalization</div>
+        <h2>Use your Groq key</h2>
+        <p class="key-copy">Add a personal Groq API key for your LLM requests. It stays in this browser and is never persisted on the server.</p>
+        <form id="groq-key-form">
+          <label for="groq-api-key">Groq API key</label>
+          <input id="groq-api-key" type="password" autocomplete="off" placeholder="gsk_…" />
+          <div class="actions">
+            <button type="submit">Continue</button>
+            <button type="button" class="secondary" id="skip-groq-key">Skip for now</button>
+          </div>
+        </form>
+      </section>
       <p id="status" aria-live="polite"></p>
-      <p class="note">Your session is stored locally for this development demo.</p>
+      <p class="note">Your session tokens stay in this browser for this development demo.</p>
     </main>
     <script>
       const $ = (id) => document.getElementById(id);
       const status = $('status');
       const setStatus = (message, error = false) => { status.textContent = message; status.classList.toggle('error', error); };
+      let finishGroqKeyStep;
       const request = async (path, body) => {
         const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const payload = await response.json();
@@ -80,11 +103,25 @@
       };
       const goToWorkspace = async (tokens) => {
         localStorage.setItem('mentor_access_token', tokens.access_token);
+        localStorage.setItem('mentor_refresh_token', tokens.refresh_token);
         localStorage.removeItem('mentor_workspace_session_id');
+        $('auth-form').hidden = true;
+        $('groq-key-step').hidden = false;
+        $('groq-api-key').focus();
+        setStatus('Choose whether to personalize your LLM requests.');
+        await new Promise((resolve) => { finishGroqKeyStep = resolve; });
         setStatus('Preparing your learning session…');
         await createLearningSession(tokens.access_token);
         location.assign('/merged/workspace/');
       };
+      const completeGroqKeyStep = () => {
+        const key = $('groq-api-key').value.trim();
+        if (key) localStorage.setItem('mentor_groq_api_key', key);
+        $('groq-key-step').hidden = true;
+        if (finishGroqKeyStep) finishGroqKeyStep();
+      };
+      $('groq-key-form').addEventListener('submit', (event) => { event.preventDefault(); completeGroqKeyStep(); });
+      $('skip-groq-key').addEventListener('click', completeGroqKeyStep);
       $('signup').addEventListener('click', async () => {
         const button = $('signup'); button.disabled = true; setStatus('Creating your account…');
         try {
@@ -101,7 +138,6 @@
         catch (error) { setStatus(error?.detail || 'Unable to sign in.', true); }
         finally { button.disabled = false; }
       });
-      if (localStorage.getItem('mentor_access_token')) location.replace('/merged/workspace/');
     </script>
   </body>
 </html>

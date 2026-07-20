@@ -71,7 +71,9 @@ The visualization module is independent from the interview module. It currently 
 
 Groq is required for the application. Set `GROQ_API_KEY` before starting the server to enable model-assisted planning, answer evaluation, interview reports, execution-step explanations, and execution summaries. `GROQ_MODEL` defaults to `llama-3.3-70b-versatile`. The server fails at startup with a clear configuration error if the key is missing.
 
-The prototype API requires `X-API-Key` and `X-User-ID` headers. The local default key is `dev-api-key`; set `INTERVIEW_API_KEY` to change it. The frontend sends these local-development headers automatically.
+The API accepts the merged workspace's `Authorization: Bearer <access-token>` header. Legacy `X-API-Key` and `X-User-ID` headers remain supported for local API clients and tests; the browser UI no longer hardcodes them.
+
+For a per-browser Groq override, send `X-Groq-Api-Key` on LLM-triggering requests. The server uses it only for that request and never persists it.
 
 The evaluator fallback is a coarse structural heuristic used only when no LLM is available. It is not a fair grading system; configure Groq for substantive evaluation.
 

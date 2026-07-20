@@ -2,7 +2,7 @@ from dataclasses import asdict
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -26,6 +26,18 @@ from app.services.session_service import SessionService
 logger = structlog.get_logger(__name__)
 
 
+def _request_groq_api_key(request: Request) -> str | None:
+    value = request.headers.get("X-Groq-Api-Key")
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    if len(value) > 512:
+        raise HTTPException(status_code=400, detail="Groq API key is too long.")
+    return value
+
+
 async def _personalization_summary(session: AsyncSession, user_id: UUID) -> PersonalizationSummary:
     context = await PersonalizationService(session).get_context(user_id)
     return PersonalizationSummary.model_validate(asdict(context))
@@ -37,11 +49,13 @@ router = APIRouter(prefix="/mentor", tags=["mentor"])
 @router.post("/chat", response_model=MentorResponse)
 async def chat(
     payload: MentorChatRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> MentorResponse:
-    message, model = await MentorService(session, settings).chat(current_user.id, payload)
+    ai_service = AIService(settings, groq_api_key=_request_groq_api_key(request))
+    message, model = await MentorService(session, settings, ai_service=ai_service).chat(current_user.id, payload)
     return MentorResponse(
         message=message,
         model=model,
@@ -52,11 +66,13 @@ async def chat(
 @router.post("/hint", response_model=HintResponse)
 async def hint(
     payload: MentorHintRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> HintResponse:
-    event, model = await MentorService(session, settings).hint(current_user.id, payload)
+    ai_service = AIService(settings, groq_api_key=_request_groq_api_key(request))
+    event, model = await MentorService(session, settings, ai_service=ai_service).hint(current_user.id, payload)
     return HintResponse(
         message=event.response,
         model=model,
@@ -70,11 +86,13 @@ async def hint(
 @router.post("/explain-error", response_model=MentorResponse)
 async def explain_error(
     payload: ExplainErrorRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> MentorResponse:
-    message, model = await MentorService(session, settings).explain_error(current_user.id, payload)
+    ai_service = AIService(settings, groq_api_key=_request_groq_api_key(request))
+    message, model = await MentorService(session, settings, ai_service=ai_service).explain_error(current_user.id, payload)
     return MentorResponse(
         message=message,
         model=model,
@@ -85,6 +103,7 @@ async def explain_error(
 @router.post("/live-nudge", response_model=LiveNudgeResponse)
 async def live_nudge(
     payload: LiveNudgeRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
@@ -105,7 +124,7 @@ async def live_nudge(
             rolling_avg_solve_time_seconds=0.0,
         )
     await SessionService(session).get(payload.session_id, current_user.id)
-    return await AIService(settings).live_nudge(
+    return await AIService(settings, groq_api_key=_request_groq_api_key(request)).live_nudge(
         payload, adaptation, session=session, user_id=current_user.id
     )
 
