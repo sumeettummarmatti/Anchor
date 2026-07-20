@@ -6,7 +6,7 @@
     <title>Mentor Lab — Phase 5 & 6</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/merged/design-system.css" />
     <script>
       (() => {
@@ -17,7 +17,7 @@
     </script>
     <script src="/merged/ui-preferences.js" defer></script>
     <style>
-      :root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      :root { font-family: 'Montserrat', Arial, Helvetica, sans-serif; }
       * { box-sizing: border-box; }
       body { margin: 0; min-height: 100vh; color: var(--text-heading); background: radial-gradient(circle at 15% 0%, rgba(20, 184, 166, .18) 0, transparent 32%), var(--bg-main); }
       main { position: relative; width: min(1180px, calc(100% - 32px)); margin: 36px auto 72px; }
@@ -69,7 +69,7 @@
       .rocky-message ul, .formatted-output ul { margin: 0 0 10px; padding-left: 20px; }
       .rocky-message code:not(.rocky-code code), .formatted-output code:not(.rocky-code code) { padding: 2px 5px; border-radius: 4px; background: rgba(20, 184, 166, .14); color: var(--accent-secondary); font-family: "SFMono-Regular", Consolas, monospace; font-size: .88em; }
       .rocky-code { position: relative; max-height: 280px; margin: 10px 0; padding: 28px 12px 12px; overflow: auto; border: 1px solid var(--border-subtle); border-left: 3px solid var(--accent-primary); border-radius: 8px; background: var(--bg-darker); color: var(--syntax-string); font: .76rem/1.5 "SFMono-Regular", Consolas, monospace; white-space: pre; }
-      .rocky-code::before { position: absolute; top: 7px; left: 12px; color: var(--text-muted); content: attr(data-language); font: 700 .65rem/1 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+      .rocky-code::before { position: absolute; top: 7px; left: 12px; color: var(--text-muted); content: attr(data-language); font: 700 .65rem/1 'Montserrat', Arial, Helvetica, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
       .rocky-code code { color: inherit; font: inherit; }
       .formatted-output { min-height: 118px; max-height: 430px; overflow: auto; margin: 0; padding: 14px; border-radius: 10px; background: var(--bg-darker); color: var(--syntax-string); font-size: .78rem; line-height: 1.5; overflow-wrap: anywhere; }
       .rocky-dots { display: inline-block; opacity: .65; animation: rocky-bob .5s ease-in-out infinite alternate; }
@@ -97,7 +97,6 @@
     </div>
     <div id="llm-status" class="llm-status" role="status" aria-live="polite">LLM: checking…</div>
     <main>
-      <div class="page-actions"><button type="button" class="icon-button" data-theme-toggle aria-label="Use light theme" title="Use light theme">☀</button></div>
       <h1>Mentor Lab.</h1>
       <p class="intro">Meet your coding mentor in a small browser workspace for running code, inspecting Ruff diagnostics, and getting Socratic guidance from your local model.</p>
 
@@ -147,10 +146,9 @@ print(greet("learner"))</textarea>
         </section>
 
         <section class="card">
-          <h3>Explain an error</h3>
-          <label for="runtime-error">Runtime/compiler error</label>
-          <textarea class="small" id="runtime-error" placeholder="Paste an error here"></textarea>
-          <button type="button" id="explain">Explain error</button>
+          <h2>Explain output</h2>
+          <p class="hint">Run your code to get a plain-language explanation of its output, errors, and analysis.</p>
+          <div id="explanation-output" class="formatted-output">Run code to see an explanation.</div>
         </section>
 
         <section class="card">
@@ -379,7 +377,9 @@ print(greet("learner"))</textarea>
       $('run').addEventListener('click', async () => {
         try {
           const sessionId = await ensureSession();
-          showExecution(await request('/execution/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, version: '3.10.0' }) }));
+          const execution = await request('/execution/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, version: '3.10.0' }) });
+          showExecution(execution);
+          await explainExecution(execution, sessionId);
           await checkStuckScore(sessionId);
         } catch (error) { showError(error); }
       });
@@ -390,9 +390,33 @@ print(greet("learner"))</textarea>
           show(recommendations);
         } catch (error) { showError(error); }
       });
-      $('explain').addEventListener('click', async () => {
-        try { showMentor(await request('/mentor/explain-error', { method: 'POST', headers: llmAuthHeaders(), body: JSON.stringify({ ...codePayload(), session_id: $('session-id').value || null, error: $('runtime-error').value }) }), { showRocky: false }); } catch (error) { showError(error); }
-      });
+      const explainExecution = async (execution, sessionId) => {
+        const explanationOutput = $('explanation-output');
+        const diagnostics = execution?.static_analysis?.diagnostics || [];
+        const diagnosticText = diagnostics.length
+          ? diagnostics.map((item) => `${item.code || 'diagnostic'} at ${item.line || '?'}:${item.column || '?'}: ${item.message || ''}`).join('\n')
+          : 'None';
+        const executionSummary = [
+          `Status: ${execution?.status || 'unknown'}`,
+          `Exit code: ${execution?.exit_code ?? 'unknown'}`,
+          `Execution time: ${execution?.execution_time_ms ?? 'unknown'} ms`,
+          `Program output:\n${execution?.stdout || '(none)'}`,
+          `Error output:\n${execution?.stderr || '(none)'}`,
+          `Static analysis diagnostics:\n${diagnosticText}`,
+        ].join('\n\n').slice(0, 12000);
+        explanationOutput.textContent = 'Preparing an explanation…';
+        try {
+          const response = await request('/mentor/explain-error', {
+            method: 'POST',
+            headers: llmAuthHeaders(),
+            body: JSON.stringify({ ...codePayload(), session_id: sessionId || null, error: executionSummary }),
+          });
+          if (response?.model) setLLMStatus('ok', response.model);
+          explanationOutput.innerHTML = renderMentorMarkdown(response.message);
+        } catch (error) {
+          explanationOutput.textContent = error?.detail || 'The output explanation is unavailable right now.';
+        }
+      };
       async function requestProgressiveHint() {
         const sessionId = await ensureSession();
         const response = await request('/mentor/hint', { method: 'POST', headers: llmAuthHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, request: 'Give me the next useful hint.' }) });

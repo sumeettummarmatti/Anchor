@@ -5,7 +5,9 @@ from app.services.ai_service import PromptContext
 
 def build(context: PromptContext) -> tuple[str, str]:
     return (
-        "Explain the programming error in plain language. Identify its likely source, "
-        "then give one or two concrete debugging steps. Do not rewrite the full program.",
+        "Explain the code execution result in plain language, whether it succeeded or failed. "
+        "Start by saying what happened, then connect the output or error to the supplied code "
+        "and static-analysis diagnostics. Give one or two concrete next steps when useful. "
+        "If the program succeeded, explain what its output means. Do not rewrite the full program.",
         context.as_prompt(),
     )
