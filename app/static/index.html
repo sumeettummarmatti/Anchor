@@ -58,11 +58,20 @@
       .rocky-name { display: block; margin-top: 4px; font-size: .72rem; letter-spacing: .04em; }
       #rocky-character.running { animation: rocky-bob .7s ease-in-out infinite alternate; }
       #rocky-character.shake { animation: rocky-shake .35s ease-in-out 2; }
-      .rocky-bubble { position: relative; width: min(360px, calc(100vw - 36px)); margin-bottom: 12px; padding: 16px; border: 1px solid rgba(45, 212, 191, .55); border-radius: 18px; background: var(--bg-card); box-shadow: var(--shadow-lg); }
+      .rocky-bubble { position: relative; width: min(480px, calc(100vw - 32px)); max-height: min(72vh, 680px); overflow-y: auto; margin-bottom: 12px; padding: 16px; border: 1px solid rgba(45, 212, 191, .55); border-radius: 18px; background: var(--bg-card); box-shadow: var(--shadow-lg); }
       .rocky-bubble::after { position: absolute; right: 30px; bottom: -11px; width: 20px; height: 20px; border-right: 1px solid rgba(45, 212, 191, .55); border-bottom: 1px solid rgba(45, 212, 191, .55); background: var(--bg-card); content: ""; transform: rotate(45deg); }
       .rocky-bubble.thinking { border-color: var(--accent-primary); }
       .rocky-bubble[hidden] { display: none; }
-      .rocky-bubble p { margin: 0; color: var(--text-heading); line-height: 1.45; }
+      .rocky-message { color: var(--text-heading); line-height: 1.45; overflow-wrap: anywhere; }
+      .rocky-message p, .formatted-output p { margin: 0 0 10px; }
+      .rocky-message p:last-child, .formatted-output p:last-child { margin-bottom: 0; }
+      .rocky-message h1, .rocky-message h2, .rocky-message h3, .formatted-output h1, .formatted-output h2, .formatted-output h3 { margin: 0 0 10px; color: var(--text-heading); font-size: .95rem; }
+      .rocky-message ul, .formatted-output ul { margin: 0 0 10px; padding-left: 20px; }
+      .rocky-message code:not(.rocky-code code), .formatted-output code:not(.rocky-code code) { padding: 2px 5px; border-radius: 4px; background: rgba(20, 184, 166, .14); color: var(--accent-secondary); font-family: "SFMono-Regular", Consolas, monospace; font-size: .88em; }
+      .rocky-code { position: relative; max-height: 280px; margin: 10px 0; padding: 28px 12px 12px; overflow: auto; border: 1px solid var(--border-subtle); border-left: 3px solid var(--accent-primary); border-radius: 8px; background: var(--bg-darker); color: var(--syntax-string); font: .76rem/1.5 "SFMono-Regular", Consolas, monospace; white-space: pre; }
+      .rocky-code::before { position: absolute; top: 7px; left: 12px; color: var(--text-muted); content: attr(data-language); font: 700 .65rem/1 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+      .rocky-code code { color: inherit; font: inherit; }
+      .formatted-output { min-height: 118px; max-height: 430px; overflow: auto; margin: 0; padding: 14px; border-radius: 10px; background: var(--bg-darker); color: var(--syntax-string); font-size: .78rem; line-height: 1.5; overflow-wrap: anywhere; }
       .rocky-dots { display: inline-block; opacity: .65; animation: rocky-bob .5s ease-in-out infinite alternate; }
       .rocky-meta { display: block; margin-top: 8px; color: var(--text-muted); font-size: .72rem; }
       .rocky-bubble button { margin-top: 10px; margin-right: 4px; padding: 7px 9px; font-size: .73rem; }
@@ -120,18 +129,10 @@
         </form>
 
         <section class="card wide">
-          <div class="row">
-            <div>
-              <h2>Code workspace</h2>
-              <label for="language">Language</label>
-              <select id="language"><option value="python">Python</option><option value="javascript">JavaScript</option></select>
-            </div>
-            <div>
-              <label for="stdin">Standard input</label>
-              <input id="stdin" placeholder="Optional stdin" />
-              <p class="hint">Python analysis uses Ruff. Execution uses your local Piston service.</p>
-            </div>
-          </div>
+          <h2>Code workspace</h2>
+          <label for="language">Language</label>
+          <select id="language"><option value="python">Python</option></select>
+          <p class="hint">Python analysis uses Ruff. Execution uses your local Piston service.</p>
           <label for="code">Code</label>
           <textarea id="code">import os
 
@@ -146,16 +147,10 @@ print(greet("learner"))</textarea>
         </section>
 
         <section class="card">
-          <h2>Mentor chat</h2>
-          <label for="chat-message">Question</label>
-          <textarea class="small" id="chat-message">What should I improve in this code?</textarea>
-          <button type="button" id="chat">Ask mentor</button>
           <h3>Explain an error</h3>
           <label for="runtime-error">Runtime/compiler error</label>
           <textarea class="small" id="runtime-error" placeholder="Paste an error here"></textarea>
-          <button type="button" id="explain" class="secondary">Explain error</button>
-          <h3>Personalization applied</h3>
-          <pre id="personalization-output">Ask the mentor to see the learner profile used.</pre>
+          <button type="button" id="explain">Explain error</button>
         </section>
 
         <section class="card">
@@ -163,7 +158,7 @@ print(greet("learner"))</textarea>
           <p class="hint">Each click advances one level. Skipping a level returns a conflict response.</p>
           <button type="button" id="hint">Get next hint</button>
           <p id="hint-level" class="pill">Next level: 1</p>
-          <pre id="hint-output">No hints requested.</pre>
+          <div id="hint-output" class="formatted-output">No hints requested.</div>
         </section>
 
         <section class="card wide">
@@ -174,7 +169,7 @@ print(greet("learner"))</textarea>
       </section>
       <div id="rocky" aria-live="polite">
         <div id="rocky-bubble" class="rocky-bubble" hidden>
-          <p id="rocky-nudge-text"></p>
+          <div id="rocky-nudge-text" class="rocky-message"></div>
           <span id="rocky-meta" class="rocky-meta"></span>
           <div class="rocky-reply">
             <input id="rocky-reply" type="text" placeholder="Talk back to Rocky…" autocomplete="off" />
@@ -195,11 +190,111 @@ print(greet("learner"))</textarea>
       const output = $('output');
       const token = () => localStorage.getItem('mentor_access_token');
       const show = (value) => { output.textContent = JSON.stringify(value, null, 2); };
-      const showMentor = (value) => {
+      const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[character]);
+      const renderInlineMarkdown = (value) => escapeHtml(value)
+        .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+      const renderMentorMarkdown = (value) => {
+        const lines = String(value || '').replace(/\r\n/g, '\n').split('\n');
+        const html = [];
+        let inCode = false;
+        let codeLanguage = 'code';
+        let codeLines = [];
+        let inList = false;
+        const closeList = () => {
+          if (inList) {
+            html.push('</ul>');
+            inList = false;
+          }
+        };
+        const addCodeBlock = () => {
+          html.push(`<pre class="rocky-code" data-language="${escapeHtml(codeLanguage)}"><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`);
+          codeLines = [];
+        };
+
+        for (const line of lines) {
+          const fence = line.match(/^\s*```([\w+#.-]*)\s*$/);
+          if (fence) {
+            if (inCode) addCodeBlock();
+            inCode = !inCode;
+            codeLanguage = fence[1] || 'code';
+            continue;
+          }
+          if (inCode) {
+            codeLines.push(line);
+            continue;
+          }
+          if (!line.trim()) {
+            closeList();
+            continue;
+          }
+          const heading = line.match(/^\s*(#{1,3})\s+(.+)$/);
+          if (heading) {
+            closeList();
+            const level = Math.min(heading[1].length + 1, 3);
+            html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
+            continue;
+          }
+          const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+          if (bullet) {
+            if (!inList) {
+              html.push('<ul>');
+              inList = true;
+            }
+            html.push(`<li>${renderInlineMarkdown(bullet[1])}</li>`);
+            continue;
+          }
+          closeList();
+          html.push(`<p>${renderInlineMarkdown(line)}</p>`);
+        }
+        if (inCode) addCodeBlock();
+        closeList();
+        return html.join('') || '<p>No response.</p>';
+      };
+      const showExecution = (value) => {
+        const lines = [];
+        const stdout = String(value?.stdout || '').trimEnd();
+        const stderr = String(value?.stderr || '').trimEnd();
+        const analysis = value?.static_analysis;
+        const diagnostics = analysis?.diagnostics || [];
+
+        if (stdout) lines.push(stdout);
+        if (stderr) {
+          if (lines.length) lines.push('');
+          lines.push(`stderr:\n${stderr}`);
+        }
+        if (!stdout && !stderr) lines.push('(no output)');
+
+        lines.push(
+          '',
+          `Process exited with code ${value?.exit_code ?? 'unknown'} (${value?.status || 'unknown'})`,
+          `Execution time: ${value?.execution_time_ms ?? 'unknown'} ms`,
+        );
+
+        if (analysis) {
+          lines.push('', `Static analysis${analysis.analyzer ? ` (${analysis.analyzer})` : ''}:`);
+          if (diagnostics.length) {
+            for (const diagnostic of diagnostics) {
+              const location = diagnostic.line ? `line ${diagnostic.line}, column ${diagnostic.column || '?'}` : 'unknown location';
+              lines.push(`- ${diagnostic.severity || 'info'} · ${location} · ${diagnostic.code || 'diagnostic'}: ${diagnostic.message || ''}`);
+            }
+          } else {
+            lines.push(analysis.available === false ? 'Unavailable' : 'No issues found.');
+          }
+        }
+
+        output.textContent = lines.join('\n');
+      };
+      const showMentor = (value, { showRocky = true } = {}) => {
         show(value);
-        if (value?.personalization) $('personalization-output').textContent = JSON.stringify(value.personalization, null, 2);
         if (value?.model && typeof setLLMStatus === 'function') setLLMStatus('ok', value.model);
-        if (value?.message && typeof showRockyMessage === 'function') showRockyMessage(value.message, value.level ? `hint · level ${value.level}` : `mentor · ${value.model || 'local model'}`);
+        if (showRocky && value?.message && typeof showRockyMessage === 'function') showRockyMessage(value.message, value.level ? `hint · level ${value.level}` : `mentor · ${value.model || 'local model'}`);
       };
 
       const setLLMStatus = (state, detail = '') => {
@@ -286,8 +381,7 @@ print(greet("learner"))</textarea>
       $('run').addEventListener('click', async () => {
         try {
           const sessionId = await ensureSession();
-          const version = $('language').value === 'python' ? '3.10.0' : '18.15.0';
-          show(await request('/execution/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, version, stdin: $('stdin').value }) }));
+          showExecution(await request('/execution/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, version: '3.10.0' }) }));
           await checkStuckScore(sessionId);
         } catch (error) { showError(error); }
       });
@@ -298,21 +392,15 @@ print(greet("learner"))</textarea>
           show(recommendations);
         } catch (error) { showError(error); }
       });
-      $('chat').addEventListener('click', async () => {
-        try {
-          const sessionId = $('session-id').value || null;
-          showMentor(await request('/mentor/chat', { method: 'POST', headers: llmAuthHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, message: $('chat-message').value }) }));
-        } catch (error) { showError(error); }
-      });
       $('explain').addEventListener('click', async () => {
-        try { showMentor(await request('/mentor/explain-error', { method: 'POST', headers: llmAuthHeaders(), body: JSON.stringify({ ...codePayload(), session_id: $('session-id').value || null, error: $('runtime-error').value }) })); } catch (error) { showError(error); }
+        try { showMentor(await request('/mentor/explain-error', { method: 'POST', headers: llmAuthHeaders(), body: JSON.stringify({ ...codePayload(), session_id: $('session-id').value || null, error: $('runtime-error').value }) }), { showRocky: false }); } catch (error) { showError(error); }
       });
       async function requestProgressiveHint() {
         const sessionId = await ensureSession();
         const response = await request('/mentor/hint', { method: 'POST', headers: llmAuthHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, request: 'Give me the next useful hint.' }) });
         $('hint-level').textContent = `Completed level: ${response.level} · next: ${Math.min(response.level + 1, 5)}`;
-        $('hint-output').textContent = response.message;
-        showMentor(response);
+        $('hint-output').innerHTML = renderMentorMarkdown(response.message);
+        showMentor(response, { showRocky: false });
         return response;
       }
       $('hint').addEventListener('click', async () => {
@@ -339,7 +427,7 @@ print(greet("learner"))</textarea>
       };
       const hideRockyBubble = () => { rockyBubble.hidden = true; };
       const showRockyMessage = (message, meta = 'mentor') => {
-        rockyNudgeText.textContent = message;
+        rockyNudgeText.innerHTML = renderMentorMarkdown(message);
         rockyNudgeText.classList.remove('rocky-dots');
         rockyMeta.textContent = meta;
         rockyBubble.classList.remove('thinking');

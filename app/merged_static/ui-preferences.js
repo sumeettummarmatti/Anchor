@@ -19,13 +19,6 @@
   const setSidebarCollapsed = (collapsed, persist = true) => {
     document.documentElement.classList.toggle("sidebar-collapsed", collapsed);
     if (persist) localStorage.setItem(SIDEBAR_KEY, String(collapsed));
-    document.querySelectorAll("[data-sidebar-toggle]").forEach((button) => {
-      button.setAttribute("aria-expanded", String(!collapsed));
-      button.setAttribute("aria-label", collapsed ? "Expand sidebar" : "Collapse sidebar");
-      button.setAttribute("title", collapsed ? "Expand sidebar" : "Collapse sidebar");
-      const label = button.querySelector("[data-sidebar-label]");
-      if (label) label.textContent = collapsed ? "Expand" : "Collapse";
-    });
   };
 
   document.querySelectorAll("[data-theme-toggle]").forEach((button) => {
@@ -33,14 +26,16 @@
       setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
     });
   });
-  document.querySelectorAll("[data-sidebar-toggle]").forEach((button) => {
-    button.addEventListener("click", () => {
-      setSidebarCollapsed(!document.documentElement.classList.contains("sidebar-collapsed"));
-    });
-  });
-
   setTheme(document.documentElement.dataset.theme || "dark", false);
-  setSidebarCollapsed(document.documentElement.classList.contains("sidebar-collapsed"), false);
+  const hoverSidebar = window.matchMedia("(hover: hover)").matches;
+  setSidebarCollapsed(hoverSidebar || document.documentElement.classList.contains("sidebar-collapsed"), false);
+
+  if (hoverSidebar) {
+    document.querySelectorAll(".sidebar").forEach((sidebar) => {
+      sidebar.addEventListener("mouseenter", () => setSidebarCollapsed(false, false));
+      sidebar.addEventListener("mouseleave", () => setSidebarCollapsed(true, false));
+    });
+  }
 
   window.addEventListener("storage", (event) => {
     if (event.key === THEME_KEY) setTheme(event.newValue || "dark", false);

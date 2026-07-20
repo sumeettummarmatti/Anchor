@@ -231,6 +231,8 @@ class AIService:
                 if context.intent == "live_nudge":
                     request["temperature"] = 0.2
                     request["max_tokens"] = 96
+                elif context.intent == "chat":
+                    request["max_tokens"] = 224
                 if provider is LLMProvider.OLLAMA:
                     # Qwen's reasoning mode can be very slow locally. Keep it
                     # disabled by default and cap generated tokens.
@@ -240,6 +242,8 @@ class AIService:
                             "num_predict": (
                                 min(self.settings.ollama_num_predict, 128)
                                 if context.intent == "live_nudge"
+                                else min(self.settings.ollama_num_predict, 224)
+                                if context.intent == "chat"
                                 else self.settings.ollama_num_predict
                             )
                         },

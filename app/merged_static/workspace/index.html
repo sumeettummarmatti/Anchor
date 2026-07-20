@@ -37,9 +37,19 @@
       button.logout:hover { border-color: var(--accent-primary); color: var(--text-heading); }
       html.sidebar-collapsed .sidebar { width: 78px; flex-basis: 78px; padding-left: 10px; padding-right: 10px; }
       html.sidebar-collapsed .brand { padding-left: 0; padding-right: 0; text-align: center; font-size: 0; }
-      html.sidebar-collapsed .brand span, html.sidebar-collapsed nav button > span:not(.nav-icon), html.sidebar-collapsed .sidebar-control > span:not(.control-icon) { display: none; }
+      html.sidebar-collapsed .brand span, html.sidebar-collapsed nav button > span:not(.nav-icon), html.sidebar-collapsed .sidebar-control > span:not(.control-icon), html.sidebar-collapsed button.logout .logout-label { display: none; }
       html.sidebar-collapsed nav button { justify-content: center; padding-left: 8px; padding-right: 8px; }
       html.sidebar-collapsed .sidebar-controls { flex-direction: column; }
+      html.sidebar-collapsed button.logout { display: flex; align-items: center; justify-content: center; padding-left: 8px; padding-right: 8px; }
+      .logout-icon { font-size: 1.2rem; line-height: 1; }
+      @media (hover: hover) {
+        html.sidebar-collapsed .sidebar:hover { width: 248px; flex-basis: 248px; padding-left: 18px; padding-right: 18px; }
+        html.sidebar-collapsed .sidebar:hover .brand { padding-left: 12px; padding-right: 12px; text-align: left; font-size: 1.05rem; }
+        html.sidebar-collapsed .sidebar:hover .brand span, html.sidebar-collapsed .sidebar:hover nav button > span:not(.nav-icon), html.sidebar-collapsed .sidebar:hover .sidebar-control > span:not(.control-icon), html.sidebar-collapsed .sidebar:hover button.logout .logout-label { display: inline; }
+        html.sidebar-collapsed .sidebar:hover nav button { justify-content: flex-start; padding-left: 12px; padding-right: 12px; }
+        html.sidebar-collapsed .sidebar:hover .sidebar-controls { flex-direction: row; }
+        html.sidebar-collapsed .sidebar:hover button.logout { justify-content: flex-start; padding-left: 13px; padding-right: 13px; }
+      }
       main { flex: 1; min-width: 0; min-height: 100vh; }
       .panel { display: none; height: 100vh; }
       .panel.active { display: block; }
@@ -68,10 +78,9 @@
         </nav>
         <div class="sidebar-bottom">
           <div class="sidebar-controls">
-            <button type="button" class="sidebar-control" data-sidebar-toggle aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar"><span class="control-icon" aria-hidden="true">‹</span><span data-sidebar-label>Collapse</span></button>
             <button type="button" class="sidebar-control" data-theme-toggle aria-label="Use light theme" title="Use light theme">☀</button>
           </div>
-          <button type="button" class="logout" id="logout">Log out</button>
+          <button type="button" class="logout" id="logout" aria-label="Log out" title="Log out"><span class="logout-icon" aria-hidden="true">⏻</span><span class="logout-label">Log out</span></button>
         </div>
       </header>
       <main>
