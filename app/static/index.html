@@ -164,7 +164,6 @@ print(greet("learner"))</textarea>
         <section class="card wide">
           <h2>Response console</h2>
           <pre id="output">Sign in, create a session, then try Analyze code.</pre>
-          <p class="hint">This development-only page stores the access token in local storage. Do not use this storage pattern for a production frontend.</p>
         </section>
       </section>
       <div id="rocky" aria-live="polite">
@@ -292,7 +291,6 @@ print(greet("learner"))</textarea>
         output.textContent = lines.join('\n');
       };
       const showMentor = (value, { showRocky = true } = {}) => {
-        show(value);
         if (value?.model && typeof setLLMStatus === 'function') setLLMStatus('ok', value.model);
         if (showRocky && value?.message && typeof showRockyMessage === 'function') showRockyMessage(value.message, value.level ? `hint · level ${value.level}` : `mentor · ${value.model || 'local model'}`);
       };
@@ -491,7 +489,6 @@ print(greet("learner"))</textarea>
           });
           if (controller !== liveAbortController) return;
           setLLMStatus('ok', 'response received');
-          show(body);
           if (body.nudge) showRockyBubble(body);
           else if (body.should_display === false) rockyMeta.textContent = 'Rocky · watching…';
           else rockyMeta.textContent = 'Rocky · waiting for a new step';
