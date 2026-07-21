@@ -22,22 +22,18 @@ class ExecutionService:
         )
         version = payload.version
         if version == "*":
-            version = (
-                "3.10.0" if payload.language.lower() in {"python", "python3", "py"} else "18.15.0"
-            )
+            version = "3.10.0"
+
         try:
             async with httpx.AsyncClient(
                 timeout=self.settings.piston_request_timeout_seconds
             ) as client:
                 response = await client.post(
-                    f"{self.settings.piston_base_url}/api/v2/execute",
+                    "https://run.glot.io/languages/python/latest",
+                    headers={"Content-type": "application/json"},
                     json={
-                        "language": payload.language,
-                        "version": version,
-                        "files": [{"content": payload.code}],
-                        "stdin": payload.stdin,
-                        "compile_timeout": 10000,
-                        "run_timeout": 3000,
+                        "files": [{"name": "main.py", "content": payload.code}],
+                        "stdin": payload.stdin or "",
                     },
                 )
                 response.raise_for_status()
@@ -45,25 +41,33 @@ class ExecutionService:
             raise ExecutionTimeoutError() from exc
         except httpx.HTTPError as exc:
             raise AIProviderError("Code execution service is unavailable.") from exc
+
         data = response.json()
-        run = data.get("run", {})
-        output = run.get("output", "")
-        status = "completed" if run.get("code") == 0 else "failed"
+        stdout = data.get("stdout", "")
+        stderr = data.get("stderr", "")
+        error = data.get("error", "")
+        # glot.io signals failure via a non-empty `error` field instead of exit code
+        exit_code = 0 if not error else 1
+        if error and error not in stderr:
+            stderr = f"{stderr}\n{error}".strip()
+
+        status = "completed" if exit_code == 0 else "failed"
         execution = ExecutionRun(
             session_id=payload.session_id,
             code_snapshot=payload.code,
             language=payload.language,
             version=version,
             stdin=payload.stdin,
-            stdout=run.get("stdout", output),
-            stderr=run.get("stderr", ""),
-            exit_code=run.get("code"),
+            stdout=stdout,
+            stderr=stderr,
+            exit_code=exit_code,
             status=status,
             static_analysis_result=analysis.model_dump(),
         )
         self.session.add(execution)
         await self.session.commit()
         await self.session.refresh(execution)
+
         if status == "completed":
             from interview_engine.app.main import get_analytics_event_publisher
 
@@ -76,4 +80,4 @@ class ExecutionService:
                     "session_id": str(payload.session_id) if payload.session_id else None,
                 },
             )
-        return execution, run.get("wall_time"), analysis
+        return execution, None, analysis
