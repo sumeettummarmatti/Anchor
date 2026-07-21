@@ -22,3 +22,13 @@
 [data-theme="light"] #interview-view .finish-interview-button,[data-theme="light"] #interview-view .finish-interview-button:hover{color:#000}
 
 [data-theme="light"] #interview-view .message{background:var(--panel2)}
+
+[data-theme="light"] .code-panel .ai-label{color:#166534}
+
+[data-theme="light"] .code-panel .statement{color:#000}
+
+[data-theme="light"] .variables-panel .variable-name{color:#166534}
+
+[data-theme="light"] .variables-panel .variable-value{color:#a16207}
+
+[data-theme="light"] .structure-array-cell text{fill:#a16207}

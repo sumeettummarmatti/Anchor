@@ -1,6 +1,43 @@
 (() => {
   const THEME_KEY = "ui_theme";
   const SIDEBAR_KEY = "sidebar_collapsed";
+  const nativeFetch = window.fetch.bind(window);
+  let refreshPromise = null;
+
+  const refreshAccessToken = async () => {
+    const refreshToken = localStorage.getItem("mentor_refresh_token");
+    if (!refreshToken) return false;
+    if (!refreshPromise) {
+      refreshPromise = nativeFetch("/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      }).then(async (response) => {
+        if (!response.ok) return false;
+        const tokens = await response.json();
+        localStorage.setItem("mentor_access_token", tokens.access_token);
+        localStorage.setItem("mentor_refresh_token", tokens.refresh_token);
+        return true;
+      }).catch(() => false).finally(() => { refreshPromise = null; });
+    }
+    return refreshPromise;
+  };
+
+  window.fetch = async (input, init = {}) => {
+    const headers = new Headers(init.headers || {});
+    const authenticated = headers.has("Authorization");
+    if (authenticated) {
+      const accessToken = localStorage.getItem("mentor_access_token");
+      if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+    }
+    const options = { ...init, headers };
+    let response = await nativeFetch(input, options);
+    if (authenticated && response.status === 401 && await refreshAccessToken()) {
+      headers.set("Authorization", `Bearer ${localStorage.getItem("mentor_access_token")}`);
+      response = await nativeFetch(input, options);
+    }
+    return response;
+  };
 
   const setTheme = (theme, persist = true) => {
     const nextTheme = theme === "light" ? "light" : "dark";

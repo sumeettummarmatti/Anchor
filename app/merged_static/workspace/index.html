@@ -92,15 +92,46 @@
       </main>
     </div>
     <script>
-      const accessToken = localStorage.getItem('mentor_access_token');
+      let accessToken = localStorage.getItem('mentor_access_token');
       if (!accessToken) location.replace('/merged/');
       const tabs = [...document.querySelectorAll('[role="tab"]')];
       const panels = [...document.querySelectorAll('[role="tabpanel"]')];
       let pendingExecutionCode = null;
+      let workspaceRefreshPromise = null;
+      const refreshWorkspaceSession = async () => {
+        const refreshToken = localStorage.getItem('mentor_refresh_token');
+        if (!refreshToken || workspaceRefreshPromise) return workspaceRefreshPromise;
+        workspaceRefreshPromise = fetch('/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        }).then(async (response) => {
+          if (!response.ok) return false;
+          const tokens = await response.json();
+          accessToken = tokens.access_token;
+          localStorage.setItem('mentor_access_token', tokens.access_token);
+          localStorage.setItem('mentor_refresh_token', tokens.refresh_token);
+          return true;
+        }).catch(() => false).finally(() => { workspaceRefreshPromise = null; });
+        return workspaceRefreshPromise;
+      };
+      setInterval(refreshWorkspaceSession, 10 * 60 * 1000);
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) refreshWorkspaceSession();
+      });
+      const syncFrameTheme = (frame) => {
+        const frameDocument = frame?.contentDocument;
+        if (frameDocument?.documentElement) frameDocument.documentElement.dataset.theme = document.documentElement.dataset.theme;
+      };
+      const syncFrameThemes = () => document.querySelectorAll('iframe').forEach(syncFrameTheme);
+      document.querySelectorAll('iframe').forEach((frame) => frame.addEventListener('load', () => syncFrameTheme(frame)));
+      new MutationObserver(syncFrameThemes).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+      syncFrameThemes();
       const selectTab = (tab) => {
         if (!tab) return;
         tabs.forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
         panels.forEach((panel) => panel.classList.toggle('active', panel.id === tab.getAttribute('aria-controls')));
+        syncFrameThemes();
         tab.focus();
         if (tab.id === 'analytics-tab') document.getElementById('analytics-frame')?.contentWindow?.location.reload();
       };

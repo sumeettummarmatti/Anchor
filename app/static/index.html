@@ -575,6 +575,16 @@ print(greet("learner"))</textarea>
           requestLiveNudge($('code').value.trim() ? 'idle_800ms' : 'empty_file');
         }, LIVE_PAUSE_MS);
       });
+      $('code').addEventListener('keydown', (event) => {
+        if (event.key !== 'Tab') return;
+        event.preventDefault();
+        const textarea = $('code');
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        textarea.value = `${textarea.value.slice(0, start)}    ${textarea.value.slice(end)}`;
+        textarea.selectionStart = textarea.selectionEnd = start + 4;
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      });
       $('rocky-hint').addEventListener('click', async () => {
         try { await requestProgressiveHint(); } catch (error) { showError(error, $('hint-output')); }
       });
