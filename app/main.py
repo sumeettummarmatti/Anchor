@@ -77,6 +77,11 @@ async def merged_login_page() -> FileResponse:
     return FileResponse("app/merged_static/index.html")
 
 
+@app.get("/", include_in_schema=False)
+async def workspace_entry() -> RedirectResponse:
+    return RedirectResponse("/merged/workspace/", status_code=307)
+
+
 # The interview engine keeps its original root-relative frontend API paths.
 # Mounting it last preserves every existing Mentor Lab route while exposing the
 # recovered engine UI and APIs unchanged for the merged workspace.
