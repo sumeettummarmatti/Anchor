@@ -27,7 +27,7 @@ async def test_demo_ui_is_served() -> None:
         response = await client.get("/demo/")
 
     assert response.status_code == 200
-    assert "Meet your coding mentor" in response.text
+    assert "A focused workspace to practice coding" in response.text
     assert 'id="llm-status"' in response.text
 
 
