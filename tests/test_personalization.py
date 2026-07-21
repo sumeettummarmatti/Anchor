@@ -1,5 +1,11 @@
+from uuid import UUID
+
 from httpx import AsyncClient
 
+from app.db import session as db_session
+from app.models.execution import ExecutionRun
+from app.models.hint_event import HintEvent
+from app.services.personalization_service import PersonalizationService
 from tests.test_projects import token_for
 
 
@@ -35,6 +41,50 @@ async def test_profile_updates_after_session_end(client: AsyncClient) -> None:
     profile = await client.get("/users/me/profile", headers=headers)
     assert profile.status_code == 200
     assert profile.json()["sessions_completed"] == 1
+
+
+async def test_open_session_history_is_available_to_mentor_context(client: AsyncClient) -> None:
+    headers, session_id = await _workspace(client, "profile-live-history@example.com")
+    user = await client.get("/users/me", headers=headers)
+    user_id = UUID(user.json()["id"])
+    parsed_session_id = UUID(session_id)
+
+    async with db_session.AsyncSessionLocal() as session:
+        session.add(
+            ExecutionRun(
+                session_id=parsed_session_id,
+                code_snapshot="print(value)",
+                language="python",
+                version="3.10.0",
+                stderr="NameError: value is not defined",
+                exit_code=1,
+                status="failed",
+                static_analysis_result={"diagnostics": []},
+            )
+        )
+        session.add(
+            HintEvent(
+                user_id=user_id,
+                session_id=parsed_session_id,
+                level=1,
+                prompt="Give me a hint",
+                response="Look at the variable name.",
+            )
+        )
+        await session.commit()
+
+        context = await PersonalizationService(session).get_context(user_id)
+
+    assert context.execution_runs == 1
+    assert context.hints_used == 1
+    assert context.teaching_style == "scaffolded"
+    assert context.rolling_failed_run_ratio == 1.0
+    assert any("failed python execution" in item for item in context.recent_activity)
+    assert any("level 1 hint" in item for item in context.recent_activity)
+    assert (
+        "History totals: 0 completed sessions, 1 execution runs, 1 hints"
+        in context.prompt_block()
+    )
 
 
 async def test_profile_endpoint_requires_authentication(client: AsyncClient) -> None:

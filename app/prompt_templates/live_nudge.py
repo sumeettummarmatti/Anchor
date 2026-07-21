@@ -32,7 +32,13 @@ def _build_system(adaptation: AdaptationContext | None) -> str:
 def _build_user(context: PromptContext) -> str:
     signal = context.learner_message or "idle pause"
     code = context.code[-3_000:] if context.code else "(empty file)"
+    adaptation = (
+        context.adaptation.prompt_block()
+        if context.adaptation is not None
+        else "Learner adaptation: unavailable"
+    )
     return (
+        f"{adaptation}\n"
         f"Language: {context.language}\n"
         f"Client signal (soft hint only): {signal}\n"
         f"Current code:\n```{context.language}\n{code}\n```\n"

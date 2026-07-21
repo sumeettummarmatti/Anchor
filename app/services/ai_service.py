@@ -63,14 +63,7 @@ class PromptContext:
         if self.hint_level is not None:
             parts.insert(1, f"Hint level: {self.hint_level} of 5")
         if self.adaptation is not None:
-            parts.insert(
-                1,
-                "Learner adaptation: "
-                f"teaching style={self.adaptation.teaching_style}, "
-                f"hint ceiling={self.adaptation.hint_depth_ceiling}, "
-                f"difficulty adjustment={self.adaptation.difficulty_adjustment:+.2f}, "
-                f"intervention frequency={self.adaptation.intervention_frequency:.2f}.",
-            )
+            parts.insert(1, self.adaptation.prompt_block())
         return "\n\n".join(parts)
 
 

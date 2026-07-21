@@ -12,6 +12,8 @@ def build(context: PromptContext) -> tuple[str, str]:
         5: "The learner has unlocked this level. Give a complete, explained solution.",
     }
     return (
-        "You are a patient coding mentor. " + level_rules[context.hint_level or 1],
+        "You are a patient coding mentor. Use the learner adaptation and recent activity "
+        "to choose an appropriately paced hint. Prioritize the current code. "
+        + level_rules[context.hint_level or 1],
         context.as_prompt(),
     )

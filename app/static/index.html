@@ -34,6 +34,16 @@
       .grid { display: grid; grid-template-columns: 1.25fr .75fr; gap: 18px; margin-top: 28px; }
       .card { background: var(--surface-overlay); border: 1px solid var(--border-subtle); border-radius: 18px; padding: 20px; box-shadow: var(--shadow-lg); }
       .wide { grid-column: 1 / -1; }
+      .recommendation-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+      .recommendation-header h2 { margin-bottom: 5px; }
+      .recommendation-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
+      .recommendation-card { min-width: 0; padding: 14px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--bg-darker); }
+      .recommendation-card h3 { margin: 12px 0 8px; font-size: .92rem; overflow-wrap: anywhere; }
+      .recommendation-card .pill { margin: 0 4px 4px 0; }
+      .recommendation-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+      .recommendation-tags .pill { margin: 0; background: rgba(45, 212, 191, .1); color: var(--text-body); font-weight: 600; }
+      .recommendation-score { margin: 10px 0 0; color: var(--text-muted); font-size: .72rem; }
+      .recommendation-empty { margin: 16px 0 0; }
       h2 { margin: 0 0 14px; font-size: 1.08rem; }
       h3 { margin: 20px 0 8px; font-size: .9rem; color: var(--text-heading); }
       label { display: block; color: var(--text-body); font-size: .8rem; margin: 11px 0 6px; }
@@ -126,6 +136,18 @@
           <p class="hint">Hints are stored against this session and must be requested in order.</p>
           <pre id="session-output">No session yet.</pre>
         </form>
+
+        <section class="card wide" id="recommendations-card">
+          <div class="recommendation-header">
+            <div>
+              <h2>Recommended problems</h2>
+              <p class="hint">Recommendations use your learner profile and recent performance history.</p>
+            </div>
+            <button type="button" id="recommend">Refresh recommendations</button>
+          </div>
+          <p id="recommendation-status" class="hint" role="status">Sign in to load recommendations.</p>
+          <div id="recommendation-output" class="recommendation-list" aria-live="polite"></div>
+        </section>
 
         <section class="card wide">
           <h2>Code workspace</h2>
@@ -333,6 +355,7 @@ print(greet("learner"))</textarea>
           localStorage.setItem('mentor_access_token', tokens.access_token);
           localStorage.setItem('mentor_refresh_token', tokens.refresh_token);
           $('auth-state').textContent = 'Logged in. Access and refresh tokens stored locally.';
+          loadRecommendations();
         } catch (error) { showError(error, $('auth-state')); }
       });
       $('profile').addEventListener('click', async () => {
@@ -389,12 +412,47 @@ print(greet("learner"))</textarea>
           await checkStuckScore(sessionId);
         } catch (error) { showError(error, output); }
       });
-      if ($('recommend')) $('recommend').addEventListener('click', async () => {
+      const renderRecommendations = (recommendations) => {
+        const target = $('recommendation-output');
+        if (!target) return;
+        if (!Array.isArray(recommendations) || !recommendations.length) {
+          target.innerHTML = '<p class="hint recommendation-empty">No recommendations are available yet.</p>';
+          return;
+        }
+        target.innerHTML = recommendations.map((recommendation) => {
+          const tags = (Array.isArray(recommendation.topic_tags) ? recommendation.topic_tags : [])
+            .map((tag) => `<span class="pill">${escapeHtml(tag)}</span>`)
+            .join('');
+          const source = recommendation.source === 'bi_encoder' ? 'Bi-encoder match' : 'Rule-based fallback';
+          const score = Number.isFinite(Number(recommendation.score))
+            ? Number(recommendation.score).toFixed(3)
+            : 'n/a';
+          return `<article class="recommendation-card">
+            <div><span class="pill">Difficulty ${escapeHtml(recommendation.difficulty)}/5</span><span class="pill">${escapeHtml(source)}</span></div>
+            <h3>${escapeHtml(recommendation.title)}</h3>
+            <div class="recommendation-tags">${tags || '<span class="hint">General practice</span>'}</div>
+            <p class="recommendation-score">Match score: ${escapeHtml(score)}</p>
+          </article>`;
+        }).join('');
+      };
+      const loadRecommendations = async () => {
+        const button = $('recommend');
+        const status = $('recommendation-status');
+        if (button) button.disabled = true;
+        if (status) status.textContent = 'Reading your profile and recent performance…';
         try {
           const recommendations = await request('/problems/recommended?k=5', { headers: authHeaders() });
-          if ($('recommendation-output')) $('recommendation-output').textContent = JSON.stringify(recommendations, null, 2);
-        } catch (error) { showError(error, $('recommendation-output')); }
-      });
+          renderRecommendations(recommendations);
+          if (status) status.textContent = `${recommendations.length} recommendations based on your current learner profile.`;
+        } catch (error) {
+          if (status) showError(error, status);
+          const target = $('recommendation-output');
+          if (target) target.innerHTML = '<p class="hint recommendation-empty">Recommendations are unavailable right now.</p>';
+        } finally {
+          if (button) button.disabled = false;
+        }
+      };
+      $('recommend').addEventListener('click', loadRecommendations);
       const explainExecution = async (execution, sessionId) => {
         const explanationOutput = $('explanation-output');
         const diagnostics = execution?.static_analysis?.diagnostics || [];
@@ -672,7 +730,10 @@ print(greet("learner"))</textarea>
       });
       checkLLMStatus();
       setInterval(checkLLMStatus, 15000);
-      if (token()) $('auth-state').textContent = 'An access token is already stored in this browser.';
+      if (token()) {
+        $('auth-state').textContent = 'An access token is already stored in this browser.';
+        loadRecommendations();
+      }
     </script>
   </body>
 </html>

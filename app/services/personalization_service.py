@@ -12,12 +12,13 @@ from app.models.execution import ExecutionRun
 from app.models.hint_event import HintEvent
 from app.models.learner_profile import LearnerProfile
 from app.models.project import LearningSession
+from app.models.user import User
 from app.repositories.learner_profile_repository import LearnerProfileRepository
 
 
 @dataclass(frozen=True)
 class AdaptationContext:
-    """Small, serializable set of learner signals used by mentor prompts."""
+    """Serializable learner signals and recent activity used by mentor prompts."""
 
     hint_depth_ceiling: int
     teaching_style: str
@@ -26,9 +27,20 @@ class AdaptationContext:
     rolling_hint_rate: float
     rolling_failed_run_ratio: float
     rolling_avg_solve_time_seconds: float
+    learner_name: str | None = None
+    sessions_completed: int = 0
+    execution_runs: int = 0
+    hints_used: int = 0
+    recent_activity: tuple[str, ...] = ()
 
     @classmethod
-    def from_profile(cls, profile: LearnerProfile) -> AdaptationContext:
+    def from_profile(
+        cls,
+        profile: LearnerProfile,
+        *,
+        learner_name: str | None = None,
+        recent_activity: tuple[str, ...] = (),
+    ) -> AdaptationContext:
         return cls(
             hint_depth_ceiling=profile.hint_depth_ceiling,
             teaching_style=profile.teaching_style,
@@ -37,6 +49,35 @@ class AdaptationContext:
             rolling_hint_rate=profile.rolling_hint_rate,
             rolling_failed_run_ratio=profile.rolling_failed_run_ratio,
             rolling_avg_solve_time_seconds=profile.rolling_avg_solve_time_seconds,
+            learner_name=learner_name,
+            sessions_completed=profile.sessions_completed,
+            execution_runs=profile.execution_runs,
+            hints_used=profile.hints_used,
+            recent_activity=recent_activity,
+        )
+
+    def prompt_block(self) -> str:
+        activity = "\n".join(f"- {item}" for item in self.recent_activity)
+        if not activity:
+            activity = "- No prior activity recorded."
+        solve_time = (
+            f"{self.rolling_avg_solve_time_seconds:.1f} seconds"
+            if self.rolling_avg_solve_time_seconds > 0
+            else "not recorded"
+        )
+        return (
+            "Learner adaptation:\n"
+            f"- Name: {self.learner_name or 'not provided'}\n"
+            f"- Teaching style: {self.teaching_style}\n"
+            f"- Hint ceiling: {self.hint_depth_ceiling}/5\n"
+            f"- Difficulty adjustment: {self.difficulty_adjustment:+.2f}\n"
+            f"- Intervention frequency: {self.intervention_frequency:.2f}\n"
+            f"- Hint rate: {self.rolling_hint_rate:.2f} per execution\n"
+            f"- Failed-run ratio: {self.rolling_failed_run_ratio:.2f}\n"
+            f"- Average solve time: {solve_time}\n"
+            f"- History totals: {self.sessions_completed} completed sessions, "
+            f"{self.execution_runs} execution runs, {self.hints_used} hints\n"
+            f"- Recent activity:\n{activity}"
         )
 
 
@@ -52,8 +93,60 @@ class PersonalizationService:
         return await self.profiles.create(user_id, commit=commit)
 
     async def get_context(self, user_id: UUID) -> AdaptationContext:
-        profile = await self.ensure_profile(user_id)
-        return AdaptationContext.from_profile(profile)
+        # Refresh from live history because the workspace may keep one session
+        # open for its entire lifetime instead of calling the session-end route.
+        profile = await self.update_after_session(user_id)
+        user = await self.session.scalar(select(User).where(User.id == user_id))
+        return AdaptationContext.from_profile(
+            profile,
+            learner_name=user.display_name if user else None,
+            recent_activity=await self._recent_activity(user_id),
+        )
+
+    async def _recent_activity(self, user_id: UUID, limit: int = 8) -> tuple[str, ...]:
+        runs_result = await self.session.execute(
+            select(ExecutionRun)
+            .join(LearningSession, ExecutionRun.session_id == LearningSession.id)
+            .where(LearningSession.user_id == user_id)
+            .order_by(ExecutionRun.created_at.desc())
+            .limit(5)
+        )
+        hints_result = await self.session.execute(
+            select(HintEvent)
+            .where(HintEvent.user_id == user_id)
+            .order_by(HintEvent.created_at.desc())
+            .limit(5)
+        )
+
+        activity: list[tuple[float, str]] = []
+        for run in runs_result.scalars():
+            status = "passed" if run.status == "completed" else "failed"
+            detail = ""
+            if run.status != "completed" and run.stderr:
+                detail = f"; error: {self._compact(run.stderr)}"
+            elif run.static_analysis_result:
+                diagnostics = run.static_analysis_result.get("diagnostics", [])
+                first_diagnostic = diagnostics[0] if diagnostics else None
+                if isinstance(first_diagnostic, dict):
+                    detail = (
+                        "; analysis: "
+                        f"{self._compact(first_diagnostic.get('message', 'issue'))}"
+                    )
+            timestamp = run.created_at.timestamp() if run.created_at else 0.0
+            activity.append((timestamp, f"{status} {run.language} execution{detail}"))
+
+        for hint in hints_result.scalars():
+            kind = "live tutor nudge" if hint.source == "nudge" else f"level {hint.level} hint"
+            timestamp = hint.created_at.timestamp() if hint.created_at else 0.0
+            activity.append((timestamp, f"requested {kind}"))
+
+        activity.sort(key=lambda item: item[0], reverse=True)
+        return tuple(item[1] for item in activity[:limit])
+
+    @staticmethod
+    def _compact(value: object, limit: int = 180) -> str:
+        text = " ".join(str(value).split())
+        return text if len(text) <= limit else f"{text[: limit - 1]}…"
 
     async def update_after_session(self, user_id: UUID) -> LearnerProfile:
         profile = await self.ensure_profile(user_id)
