@@ -66,13 +66,27 @@
       .actions { display: flex; flex-wrap: wrap; align-items: center; }
       code { color: var(--accent-secondary); }
       #live-tutor-toggle.live-on { color: var(--accent-tertiary); border-color: var(--accent-tertiary); }
-      #rocky { position: fixed; right: 22px; bottom: 22px; z-index: 9999; user-select: none; }
-      #rocky-character { display: flex; width: 96px; height: 82px; margin: 0; padding: 7px; flex-direction: column; align-items: center; justify-content: center; border: 2px solid var(--accent-secondary); border-radius: 24px; background: linear-gradient(145deg, var(--accent-secondary), var(--accent-primary)); color: var(--bg-darker); box-shadow: 0 12px 32px rgba(0, 0, 0, .5), var(--glow-primary); font-weight: 900; touch-action: none; }
-      .rocky-avatar { display: block; font-size: 2.2rem; line-height: 1; }
-      .rocky-name { display: block; margin-top: 4px; font-size: .72rem; letter-spacing: .04em; }
+      #rocky { position: fixed; right: 22px; bottom: 22px; z-index: 9999; user-select: none; transition: left .9s cubic-bezier(.22, 1, .36, 1), top .9s cubic-bezier(.22, 1, .36, 1), right .9s cubic-bezier(.22, 1, .36, 1), bottom .9s cubic-bezier(.22, 1, .36, 1); }
+      #rocky.dragging { transition: none; }
+      #rocky-confetti { position: absolute; top: 0; left: 0; z-index: 1; width: 1px; height: 1px; pointer-events: none; overflow: visible; }
+      .rocky-confetti-piece { position: absolute; top: 14px; left: 0; width: 7px; height: 11px; border-radius: 1px; background: var(--confetti-color); animation: rocky-confetti-fall .95s cubic-bezier(.16, .74, .34, 1) var(--confetti-delay) forwards; }
+      #rocky-character { display: flex; width: 150px; height: 155px; margin: 0; padding: 4px; flex-direction: column; align-items: center; justify-content: center; border: 0; border-radius: 0; background: transparent; color: var(--text-heading); box-shadow: none; font-weight: 900; touch-action: none; }
+      .rocky-avatar { display: block; width: 125px; height: 135px; background-image: url('/demo/rocky-sprite.png'); background-position: 0 -16px; background-repeat: no-repeat; background-size: 500px 333px; image-rendering: pixelated; }
+      .rocky-name { display: block; margin-top: -1px; color: var(--accent-secondary); font-size: .62rem; letter-spacing: .08em; text-transform: uppercase; text-shadow: 0 1px 6px rgba(0, 0, 0, .7); }
       #rocky-character.running { animation: rocky-bob .7s ease-in-out infinite alternate; }
       #rocky-character.shake { animation: rocky-shake .35s ease-in-out 2; }
-      .rocky-bubble { position: relative; width: min(480px, calc(100vw - 32px)); max-height: min(72vh, 680px); overflow-y: auto; margin-bottom: 12px; padding: 16px; border: 1px solid rgba(45, 212, 191, .55); border-radius: 18px; background: var(--bg-card); box-shadow: var(--shadow-lg); }
+      #rocky[data-pet-state="wandering"] #rocky-character { animation: rocky-hoverboard .72s ease-in-out infinite alternate; }
+      #rocky[data-pet-state="sleeping"] #rocky-character { filter: grayscale(.35); opacity: .72; }
+      #rocky[data-pet-state="running"] .rocky-avatar { background-position: 0 -166px; }
+      #rocky[data-pet-state="observing"] .rocky-avatar { background-position: 0 -16px; transform: scaleX(-1); }
+      #rocky[data-pet-state="thinking"] .rocky-avatar { background-position: 0 -166px; transform: scaleX(-1); }
+      #rocky[data-pet-state="happy"] .rocky-avatar { background-position: -375px -16px; }
+      #rocky[data-pet-state="sleeping"] .rocky-avatar { background-position: -375px -166px; }
+      #rocky[data-pet-state="wandering"] .rocky-avatar { animation: rocky-hoverboard-frames .96s steps(1, end) infinite; }
+      #rocky[data-pet-state="sprinting"] #rocky-character { animation: rocky-hoverboard .36s ease-in-out infinite alternate; }
+      #rocky[data-pet-state="sprinting"] .rocky-avatar { animation: rocky-hoverboard-frames .48s steps(1, end) infinite; }
+      #rocky[data-bubble-side="left"] .rocky-bubble { transform: translateX(calc(-100% + 150px)); }
+      .rocky-bubble { position: relative; top: -18px; width: min(480px, calc(100vw - 32px)); max-height: min(72vh, 680px); overflow-y: auto; margin-bottom: 12px; padding: 16px; border: 1px solid rgba(45, 212, 191, .55); border-radius: 18px; background: var(--bg-card); box-shadow: var(--shadow-lg); }
       .rocky-bubble::after { position: absolute; right: 30px; bottom: -11px; width: 20px; height: 20px; border-right: 1px solid rgba(45, 212, 191, .55); border-bottom: 1px solid rgba(45, 212, 191, .55); background: var(--bg-card); content: ""; transform: rotate(45deg); }
       .rocky-bubble.thinking { border-color: var(--accent-primary); }
       .rocky-bubble[hidden] { display: none; }
@@ -96,7 +110,11 @@
       .rocky-reply input { min-width: 0; margin: 0; padding: 8px 9px; font-size: .78rem; }
       .rocky-reply button { flex: 0 0 auto; margin: 0; }
       @keyframes rocky-bob { from { transform: translateY(0); } to { transform: translateY(-6px); } }
+      @keyframes rocky-hoverboard { from { transform: translateY(0); } to { transform: translateY(-4px); } }
+      @keyframes rocky-hoverboard-frames { 0%, 49% { background-position: -125px -16px; transform: scaleX(-1); } 50%, 100% { background-position: -250px -16px; transform: scaleX(-1); } }
+      @keyframes rocky-confetti-fall { from { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); } to { opacity: 0; transform: translate3d(var(--confetti-x), var(--confetti-y), 0) rotate(var(--confetti-rotation)); } }
       @keyframes rocky-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+      @media (prefers-reduced-motion: reduce) { #rocky, #rocky-character, .rocky-confetti-piece { transition: none; animation: none !important; } }
       .stuck-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 10001; background: var(--accent-tertiary); color: var(--bg-darker); padding: 12px 24px; display: flex; justify-content: center; gap: 16px; align-items: center; font-weight: bold; box-shadow: var(--shadow-sm); }
       .stuck-banner button { margin: 0; background: var(--bg-darker); color: var(--accent-tertiary); padding: 6px 12px; font-weight: 800; border: none; border-radius: 6px; cursor: pointer; }
       .stuck-banner[hidden] { display: none; }
@@ -196,6 +214,7 @@
         </section>
       </section>
       <div id="rocky" aria-live="polite">
+        <div id="rocky-confetti" aria-hidden="true"></div>
         <div id="rocky-bubble" class="rocky-bubble" hidden>
           <div id="rocky-nudge-text" class="rocky-message"></div>
           <span id="rocky-meta" class="rocky-meta"></span>
@@ -211,7 +230,7 @@
             <button type="button" id="rocky-dismiss" class="ghost">Dismiss</button>
           </div>
         </div>
-        <button type="button" id="rocky-character" aria-label="Rocky live tutor"><span class="rocky-avatar" aria-hidden="true">🐶</span><span class="rocky-name">Rocky</span></button>
+        <button type="button" id="rocky-character" aria-label="Rocky live tutor"><span class="rocky-avatar" aria-hidden="true"></span><span class="rocky-name">Rocky</span></button>
       </div>
     </main>
     <script>
@@ -415,11 +434,15 @@
         try {
           const sessionId = await ensureSession();
           const execution = await request('/execution/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, version: '3.10.0' }) });
-          $('execution-result').value = execution?.status === 'completed' ? 'Passed' : 'Failed';
+          const executionSucceeded = execution?.status === 'completed';
+          $('execution-result').value = executionSucceeded ? 'Passed' : 'Failed';
+          setRockyState(executionSucceeded ? 'happy' : 'error');
+          if (executionSucceeded) celebrateRocky();
+          setTimeout(() => setRockyState('idle'), 1400);
           showExecution(execution);
           await explainExecution(execution, sessionId);
           await checkStuckScore(sessionId);
-        } catch (error) { showError(error, output); }
+        } catch (error) { setRockyState('error'); setTimeout(() => setRockyState('idle'), 900); showError(error, output); }
       });
       const loadProblemIntoWorkspace = (detail) => {
         const asText = (value) => {
@@ -544,7 +567,14 @@
       let liveModeActive = false;
       let livePauseTimer = null;
       let liveAbortController = null;
+      let rockySprintDone = false;
+      let rockySprintFinishedTimer = null;
+      let rockyWaitingForNudge = false;
       let rockyDragged = false;
+      let rockyDragging = false;
+      let rockyWanderTimer = null;
+      let rockyWorkspaceVisible = true;
+      let rockyManualPosition = false;
       const rocky = $('rocky');
       const rockyCharacter = $('rocky-character');
       const rockyBubble = $('rocky-bubble');
@@ -552,18 +582,123 @@
       const rockyMeta = $('rocky-meta');
       const rockyReply = $('rocky-reply');
       const rockyAgentToggle = $('rocky-agent-toggle');
+      const rockyConfetti = $('rocky-confetti');
       const rockyConversation = [];
+      const celebrateRocky = () => {
+        if (!rockyConfetti || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const colors = ['#2dd4bf', '#34d399', '#facc15', '#fb7185', '#60a5fa', '#c084fc'];
+        rockyConfetti.replaceChildren();
+        for (let index = 0; index < 28; index += 1) {
+          const piece = document.createElement('span');
+          piece.className = 'rocky-confetti-piece';
+          piece.style.setProperty('--confetti-color', colors[index % colors.length]);
+          piece.style.setProperty('--confetti-x', `${Math.round((Math.random() - 0.5) * 260)}px`);
+          piece.style.setProperty('--confetti-y', `${Math.round(-60 - Math.random() * 150)}px`);
+          piece.style.setProperty('--confetti-rotation', `${Math.round((Math.random() - 0.5) * 720)}deg`);
+          piece.style.setProperty('--confetti-delay', `${Math.round(Math.random() * 140)}ms`);
+          rockyConfetti.appendChild(piece);
+        }
+        setTimeout(() => rockyConfetti.replaceChildren(), 1400);
+      };
+      const stopRockyWander = () => {
+        if (rockyWanderTimer !== null) {
+          clearTimeout(rockyWanderTimer);
+          rockyWanderTimer = null;
+        }
+      };
+      const scheduleRockyWander = () => {
+        stopRockyWander();
+        if (rockyManualPosition) return;
+        rockyWanderTimer = setTimeout(() => {
+          if (!rockyWorkspaceVisible) {
+            rockyWanderTimer = null;
+            return;
+          }
+          if (rockyDragging || !rockyBubble.hidden || document.hidden) return scheduleRockyWander();
+          const width = rocky.offsetWidth || 150;
+          const height = rocky.offsetHeight || 155;
+          const currentRect = rocky.getBoundingClientRect();
+          const currentLeft = Number.isFinite(currentRect.left) ? currentRect.left : window.innerWidth - width - 22;
+          const left = liveModeActive
+            ? 12 + Math.random() * Math.max(0, window.innerWidth - width - 24)
+            : Math.max(12, Math.min(window.innerWidth - width - 12, currentLeft));
+          const top = 12 + Math.random() * Math.max(0, window.innerHeight - height - 24);
+          rocky.style.left = `${left}px`;
+          rocky.style.top = `${top}px`;
+          rocky.style.right = 'auto';
+          rocky.style.bottom = 'auto';
+          setRockyState('wandering');
+          setTimeout(() => {
+            if (!rockyDragging) setRockyState('idle');
+            scheduleRockyWander();
+          }, 1300);
+        }, 5000 + Math.random() * 7000);
+      };
       const setRockyState = (state) => {
         rockyCharacter.classList.toggle('running', state === 'running');
         rockyCharacter.classList.toggle('shake', state === 'error');
+        rocky.dataset.petState = state;
+        rocky.dataset.bubbleSide = rocky.getBoundingClientRect().left > window.innerWidth / 2 ? 'left' : 'right';
       };
-      const hideRockyBubble = () => { rockyBubble.hidden = true; };
+      const restoreRockyPosition = () => {
+        if (!rocky.style.left && !rocky.style.top) return;
+        const width = rocky.offsetWidth || 150;
+        const height = rocky.offsetHeight || 155;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        if (viewportWidth <= width || viewportHeight <= height) return;
+        const rect = rocky.getBoundingClientRect();
+        if (!Number.isFinite(rect.left) || !Number.isFinite(rect.top)) return;
+        const left = Math.max(12, Math.min(viewportWidth - width - 12, rect.left));
+        const top = Math.max(12, Math.min(viewportHeight - height - 12, rect.top));
+        rocky.style.left = `${left}px`;
+        rocky.style.top = `${top}px`;
+        rocky.style.right = 'auto';
+        rocky.style.bottom = 'auto';
+        setRockyState(rocky.dataset.petState || 'idle');
+      };
+      window.addEventListener('message', (event) => {
+        if (event.source !== window.parent || event.origin !== window.location.origin || event.data?.type !== 'mentor-visibility') return;
+        rockyWorkspaceVisible = event.data.visible !== false;
+        if (!rockyWorkspaceVisible) {
+          stopRockyWander();
+          return;
+        }
+        requestAnimationFrame(() => {
+          restoreRockyPosition();
+          scheduleRockyWander();
+        });
+      });
+      const hideRockyBubble = () => { rockyBubble.hidden = true; scheduleRockyWander(); };
       const showRockyMessage = (message, meta = 'mentor') => {
+        stopRockyWander();
+        setRockyState('idle');
         rockyNudgeText.innerHTML = renderMentorMarkdown(message);
         rockyNudgeText.classList.remove('rocky-dots');
         rockyMeta.textContent = meta;
         rockyBubble.classList.remove('thinking');
         rockyBubble.hidden = false;
+      };
+      const sprintRockyToCode = () => {
+        if (rockySprintDone) return false;
+        rockySprintDone = true;
+        stopRockyWander();
+        const codeRect = $('code').getBoundingClientRect();
+        const width = rocky.offsetWidth || 150;
+        const height = rocky.offsetHeight || 155;
+        const left = Math.min(window.innerWidth - width - 12, codeRect.right + 64);
+        const top = Math.max(12, Math.min(window.innerHeight - height - 12, codeRect.top + 18));
+        rocky.style.left = `${Math.max(12, left)}px`;
+        rocky.style.top = `${top}px`;
+        rocky.style.right = 'auto';
+        rocky.style.bottom = 'auto';
+        setRockyState('sprinting');
+        clearTimeout(rockySprintFinishedTimer);
+        rockySprintFinishedTimer = setTimeout(() => {
+          if (rocky.dataset.petState === 'sprinting') setRockyState(rockyWaitingForNudge ? 'thinking' : 'observing');
+          rockySprintFinishedTimer = null;
+        }, 950);
+        return true;
       };
       const showRockyBubble = (body) => {
         showRockyMessage(body.nudge, `${body.nudge_type} · ${body.stage}`);
@@ -608,8 +743,9 @@
         liveAbortController = new AbortController();
         const controller = liveAbortController;
         const timeout = setTimeout(() => controller.abort(), 20000);
+        rockyWaitingForNudge = true;
         showRockyThinking();
-        setRockyState('running');
+        if (rocky.dataset.petState !== 'sprinting') setRockyState('thinking');
         try {
           const sessionId = await ensureSession();
           // Live Tutor may have been switched off while the session was being
@@ -626,12 +762,14 @@
           if (body.nudge) showRockyBubble(body);
           else if (body.should_display === false) rockyMeta.textContent = 'Rocky · watching…';
           else rockyMeta.textContent = 'Rocky · waiting for a new step';
-          setRockyState('idle');
+          rockyWaitingForNudge = false;
+          setRockyState(body.should_display === false ? 'thinking' : 'observing');
         } catch (error) {
           if (controller === liveAbortController) {
+            rockyWaitingForNudge = false;
             rockyMeta.textContent = error?.name === 'AbortError' ? 'Rocky · still watching' : 'Rocky · offline';
             setRockyState('error');
-            setTimeout(() => setRockyState('idle'), 900);
+            setTimeout(() => setRockyState('observing'), 900);
             if (error?.name !== 'AbortError') rockyMeta.textContent = `Rocky · ${error?.detail || 'offline'}`;
           }
         } finally {
@@ -647,6 +785,10 @@
         if (!active) {
           clearTimeout(livePauseTimer);
           livePauseTimer = null;
+          clearTimeout(rockySprintFinishedTimer);
+          rockySprintFinishedTimer = null;
+          rockySprintDone = false;
+          rockyWaitingForNudge = false;
           liveAbortController?.abort();
           liveAbortController = null;
           setRockyState('idle');
@@ -674,8 +816,13 @@
       $('code').addEventListener('input', () => {
         clearTimeout(livePauseTimer);
         livePauseTimer = null;
+        if (liveModeActive) {
+          const sprinted = sprintRockyToCode();
+          if (!sprinted && rocky.dataset.petState !== 'sprinting') setRockyState('observing');
+        }
         if (!liveModeActive) return;
         livePauseTimer = setTimeout(() => {
+          livePauseTimer = null;
           if (!liveModeActive) return;
           requestLiveNudge($('code').value.trim() ? 'idle_800ms' : 'empty_file');
         }, LIVE_PAUSE_MS);
@@ -745,25 +892,42 @@
         } catch (error) { showError(error, rockyMeta); }
       });
       rockyCharacter.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
         rockyDragged = false;
-        const rect = rocky.getBoundingClientRect();
-        const offsetX = event.clientX - rect.left;
-        const offsetY = event.clientY - rect.top;
+        rockyDragging = false;
+        stopRockyWander();
+        const rootRect = rocky.getBoundingClientRect();
+        const characterRect = rockyCharacter.getBoundingClientRect();
+        const characterOffsetX = characterRect.left - rootRect.left;
+        const characterOffsetY = characterRect.top - rootRect.top;
+        const offsetX = event.clientX - characterRect.left;
+        const offsetY = event.clientY - characterRect.top;
         rockyCharacter.setPointerCapture(event.pointerId);
         const move = (moveEvent) => {
-          if (Math.abs(moveEvent.clientX - event.clientX) > 4 || Math.abs(moveEvent.clientY - event.clientY) > 4) rockyDragged = true;
+          if (Math.abs(moveEvent.clientX - event.clientX) > 4 || Math.abs(moveEvent.clientY - event.clientY) > 4) { rockyDragged = true; rockyDragging = true; }
           if (!rockyDragged) return;
-          rocky.style.left = `${Math.max(8, Math.min(window.innerWidth - rect.width - 8, moveEvent.clientX - offsetX))}px`;
-          rocky.style.top = `${Math.max(8, Math.min(window.innerHeight - rect.height - 8, moveEvent.clientY - offsetY))}px`;
+          rockyManualPosition = true;
+          rocky.classList.add('dragging');
+          const desiredRootLeft = moveEvent.clientX - offsetX - characterOffsetX;
+          const desiredRootTop = moveEvent.clientY - offsetY - characterOffsetY;
+          const left = Math.max(8, Math.min(window.innerWidth - characterRect.width - 8, desiredRootLeft + characterOffsetX)) - characterOffsetX;
+          const top = Math.max(8, Math.min(window.innerHeight - characterRect.height - 8, desiredRootTop + characterOffsetY)) - characterOffsetY;
+          rocky.style.left = `${left}px`;
+          rocky.style.top = `${top}px`;
           rocky.style.right = 'auto';
           rocky.style.bottom = 'auto';
         };
         const up = () => {
           rockyCharacter.removeEventListener('pointermove', move);
           rockyCharacter.removeEventListener('pointerup', up);
+          rockyCharacter.removeEventListener('pointercancel', up);
+          rockyDragging = false;
+          rocky.classList.remove('dragging');
+          if (!rockyManualPosition) scheduleRockyWander();
         };
         rockyCharacter.addEventListener('pointermove', move);
         rockyCharacter.addEventListener('pointerup', up, { once: true });
+        rockyCharacter.addEventListener('pointercancel', up, { once: true });
       });
       rockyCharacter.addEventListener('click', () => {
         if (rockyDragged || !rockyBubble.hidden) return;
@@ -787,6 +951,7 @@
       if (token()) {
         $('auth-state').textContent = 'An access token is already stored in this browser.';
       }
+      scheduleRockyWander();
     </script>
   </body>
 </html>

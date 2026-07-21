@@ -129,11 +129,15 @@
       document.querySelectorAll('iframe').forEach((frame) => frame.addEventListener('load', () => syncFrameTheme(frame)));
       new MutationObserver(syncFrameThemes).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
       syncFrameThemes();
+      const mentorFrame = document.getElementById('mentor-frame');
+      const notifyMentorVisibility = (visible) => mentorFrame.contentWindow?.postMessage({ type: 'mentor-visibility', visible }, window.location.origin);
       const selectTab = (tab) => {
         if (!tab) return;
         tabs.forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
         panels.forEach((panel) => panel.classList.toggle('active', panel.id === tab.getAttribute('aria-controls')));
         syncFrameThemes();
+        if (tab.id === 'mentor-tab') requestAnimationFrame(() => notifyMentorVisibility(true));
+        else notifyMentorVisibility(false);
         tab.focus();
       };
       tabs.forEach((tab) => tab.addEventListener('click', () => selectTab(tab)));
