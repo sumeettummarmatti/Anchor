@@ -153,6 +153,18 @@
 
         <section class="card wide">
           <h2>Code workspace</h2>
+          <div class="row">
+            <div>
+              <label for="problem-title">Problem title</label>
+              <input id="problem-title" value="Two Sum" />
+            </div>
+            <div>
+              <label for="difficulty">Difficulty</label>
+              <select id="difficulty"><option>Easy</option><option>Medium</option><option>Hard</option></select>
+            </div>
+          </div>
+          <label for="problem-description">Problem description</label>
+          <textarea id="problem-description" class="small">Find two numbers in an array that add up to a target.</textarea>
           <label for="language">Language</label>
           <select id="language"><option value="python">Python</option></select>
           <p class="hint">Python analysis uses Ruff. Execution uses your local Piston service.</p>
@@ -163,6 +175,8 @@ def greet(name):
     return f"Hello, {name}!"
 
 print(greet("learner"))</textarea>
+          <label for="execution-result">Execution result</label>
+          <input id="execution-result" value="Not run" readonly />
           <div class="actions">
             <button type="button" id="analyze">Analyze code</button>
             <button type="button" id="run" class="secondary">Run code</button>
@@ -201,6 +215,7 @@ print(greet("learner"))</textarea>
             <button type="button" id="rocky-hint">Give me a hint</button>
             <button type="button" id="rocky-agent-toggle" class="ghost">🤖 Agent mode: OFF</button>
             <button type="button" id="rocky-visualise" class="secondary">Visualise</button>
+            <button type="button" id="rocky-interview" class="secondary">Interview</button>
             <button type="button" id="rocky-dismiss" class="ghost">Dismiss</button>
           </div>
         </div>
@@ -409,6 +424,7 @@ print(greet("learner"))</textarea>
         try {
           const sessionId = await ensureSession();
           const execution = await request('/execution/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, version: '3.10.0' }) });
+          $('execution-result').value = execution?.status === 'completed' ? 'Passed' : 'Failed';
           showExecution(execution);
           await explainExecution(execution, sessionId);
           await checkStuckScore(sessionId);
@@ -686,6 +702,17 @@ print(greet("learner"))</textarea>
       });
       $('rocky-visualise').addEventListener('click', () => {
         window.parent.postMessage({ type: 'mentor-visualise', code: $('code').value }, window.location.origin);
+      });
+      $('rocky-interview').addEventListener('click', () => {
+        window.parent.postMessage({
+          type: 'mentor-interview',
+          code: $('code').value,
+          title: $('problem-title').value,
+          difficulty: $('difficulty').value,
+          description: $('problem-description').value,
+          language: $('language').value,
+          executionResult: $('execution-result').value,
+        }, window.location.origin);
       });
       $('rocky-dismiss').addEventListener('click', async () => {
         try {

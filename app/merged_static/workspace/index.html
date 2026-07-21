@@ -87,7 +87,7 @@
       <main>
         <section class="panel active" id="mentor-panel" role="tabpanel" aria-labelledby="mentor-tab"><iframe id="mentor-frame" title="Coding Mentor" src="/demo/"></iframe></section>
         <section class="panel" id="execution-panel" role="tabpanel" aria-labelledby="execution-tab"><iframe id="execution-frame" title="Execution Lab" src="/static/index.html?view=lab&merged=1"></iframe></section>
-        <section class="panel" id="interview-panel" role="tabpanel" aria-labelledby="interview-tab"><iframe title="Interview Engine" src="/static/index.html?view=interview&merged=1"></iframe></section>
+        <section class="panel" id="interview-panel" role="tabpanel" aria-labelledby="interview-tab"><iframe id="interview-frame" title="Interview Engine" src="/static/index.html?view=interview&merged=1"></iframe></section>
         <section class="panel" id="analytics-panel" role="tabpanel" aria-labelledby="analytics-tab"><iframe id="analytics-frame" title="Performance Analytics" src="/static/index.html?view=analytics&merged=1"></iframe></section>
       </main>
     </div>
@@ -97,6 +97,7 @@
       const tabs = [...document.querySelectorAll('[role="tab"]')];
       const panels = [...document.querySelectorAll('[role="tabpanel"]')];
       let pendingExecutionCode = null;
+      let pendingInterviewData = null;
       let workspaceRefreshPromise = null;
       const refreshWorkspaceSession = async () => {
         const refreshToken = localStorage.getItem('mentor_refresh_token');
@@ -215,12 +216,38 @@
         pendingExecutionCode = null;
       };
       document.getElementById('execution-frame').addEventListener('load', copyCodeToExecutionLab);
+      const copyInterviewToCoach = () => {
+        if (!pendingInterviewData) return;
+        const interviewDocument = document.getElementById('interview-frame').contentDocument;
+        if (!interviewDocument) return;
+        const fields = {
+          'interview-title': pendingInterviewData.title,
+          'interview-difficulty': pendingInterviewData.difficulty,
+          'interview-description': pendingInterviewData.description,
+          'interview-code': pendingInterviewData.code,
+          'interview-language': pendingInterviewData.language,
+          'interview-execution': pendingInterviewData.executionResult,
+        };
+        Object.entries(fields).forEach(([id, value]) => {
+          const field = interviewDocument.getElementById(id);
+          if (field && value !== undefined) field.value = value;
+        });
+        pendingInterviewData = null;
+      };
+      document.getElementById('interview-frame').addEventListener('load', copyInterviewToCoach);
       window.addEventListener('message', (event) => {
         if (event.origin !== window.location.origin || event.source !== document.getElementById('mentor-frame').contentWindow) return;
-        if (event.data?.type !== 'mentor-visualise' || typeof event.data.code !== 'string') return;
-        pendingExecutionCode = event.data.code;
-        copyCodeToExecutionLab();
-        selectTab(document.getElementById('execution-tab'));
+        if (event.data?.type === 'mentor-visualise' && typeof event.data.code === 'string') {
+          pendingExecutionCode = event.data.code;
+          copyCodeToExecutionLab();
+          selectTab(document.getElementById('execution-tab'));
+          return;
+        }
+        if (event.data?.type === 'mentor-interview' && typeof event.data.code === 'string') {
+          pendingInterviewData = event.data;
+          copyInterviewToCoach();
+          selectTab(document.getElementById('interview-tab'));
+        }
       });
     </script>
   </body>
