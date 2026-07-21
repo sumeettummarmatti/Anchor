@@ -40,6 +40,12 @@ analytics_repository = SQLiteAnalyticsRepository(os.getenv("ANALYTICS_SQLITE_PAT
 analytics_event_processor = EventProcessor(analytics_repository)
 analytics_event_publisher = EventPublisher(analytics_event_processor)
 analytics_service = AnalyticsService(analytics_repository)
+
+
+def get_analytics_event_publisher() -> EventPublisher:
+    return analytics_event_publisher
+
+
 service = InterviewService(repository, planner=Planner(llm), evaluator=Evaluator(llm), followups=FollowupGenerator(llm), reports=ReportGenerator(llm), answer_coach=AnswerCoach(llm), event_publisher=analytics_event_publisher)
 visualization_repository = VisualizationRepository()
 visualization_service = VisualizationService(visualization_repository, explainer=AIExplainer(llm), summary=SummaryGenerator(llm), event_publisher=analytics_event_publisher)

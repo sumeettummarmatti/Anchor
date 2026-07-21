@@ -35,7 +35,10 @@
       #status { min-height: 1.4em; margin: 15px 0 0; font-size: .84rem; }
       #status.error { color: var(--status-error); }
       .note { font-size: .78rem; }
-      #auth-form[hidden], #groq-key-step[hidden] { display: none; }
+      #auth-panel[hidden], #groq-key-step[hidden], #display-name-field[hidden] { display: none; }
+      .auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 22px 0 2px; }
+      .auth-tab { background: var(--bg-card); color: var(--text-body); border: 1px solid var(--border-subtle); box-shadow: none; }
+      .auth-tab[aria-selected="true"] { background: var(--gradient-primary); color: var(--bg-darker); border-color: transparent; box-shadow: var(--glow-primary); }
       .key-copy { margin-top: 0; }
     </style>
   </head>
@@ -45,18 +48,25 @@
       <div class="eyebrow">Unified learning workspace</div>
       <h1>Welcome back.</h1>
       <p>Create an account or sign in to open your coding mentor and interview engine in one place.</p>
-      <form id="auth-form">
-        <label for="display-name">Display name <span>(sign-up only)</span></label>
-        <input id="display-name" value="Ada Learner" autocomplete="name" />
-        <label for="email">Email</label>
-        <input id="email" type="email" required autocomplete="email" placeholder="ada@example.com" />
-        <label for="password">Password</label>
-        <input id="password" type="password" required minlength="8" autocomplete="current-password" />
-        <div class="actions">
-          <button type="button" id="signup">Create account</button>
-          <button type="submit" class="secondary">Log in</button>
+      <div id="auth-panel">
+        <div class="auth-tabs" role="tablist" aria-label="Account access">
+          <button type="button" id="login-tab" class="auth-tab" role="tab" aria-selected="true" aria-controls="auth-form">Log in</button>
+          <button type="button" id="signup-tab" class="auth-tab" role="tab" aria-selected="false" aria-controls="auth-form">Sign up</button>
         </div>
-      </form>
+        <form id="auth-form">
+          <div id="display-name-field" hidden>
+            <label for="display-name">Display name</label>
+            <input id="display-name" value="Ada Learner" autocomplete="name" />
+          </div>
+          <label for="email">Email</label>
+          <input id="email" type="email" required autocomplete="email" placeholder="ada@example.com" />
+          <label for="password">Password</label>
+          <input id="password" type="password" required minlength="8" autocomplete="current-password" />
+          <div class="actions">
+            <button type="submit" id="auth-submit">Log in</button>
+          </div>
+        </form>
+      </div>
       <section id="groq-key-step" hidden>
         <div class="eyebrow">Optional personalization</div>
         <h2>Use your Groq key</h2>
@@ -105,7 +115,7 @@
         localStorage.setItem('mentor_access_token', tokens.access_token);
         localStorage.setItem('mentor_refresh_token', tokens.refresh_token);
         localStorage.removeItem('mentor_workspace_session_id');
-        $('auth-form').hidden = true;
+        $('auth-panel').hidden = true;
         $('groq-key-step').hidden = false;
         $('groq-api-key').focus();
         setStatus('Choose whether to personalize your LLM requests.');
@@ -122,20 +132,35 @@
       };
       $('groq-key-form').addEventListener('submit', (event) => { event.preventDefault(); completeGroqKeyStep(); });
       $('skip-groq-key').addEventListener('click', completeGroqKeyStep);
-      $('signup').addEventListener('click', async () => {
-        const button = $('signup'); button.disabled = true; setStatus('Creating your account…');
-        try {
-          await request('/auth/register', { ...credentials(), display_name: $('display-name').value });
-          const tokens = await request('/auth/login', credentials());
-          await goToWorkspace(tokens);
-        } catch (error) { setStatus(error?.detail || 'Unable to create the account.', true); }
-        finally { button.disabled = false; }
-      });
+      let authMode = 'login';
+      const setAuthMode = (mode) => {
+        authMode = mode;
+        const isSignup = mode === 'signup';
+        $('login-tab').setAttribute('aria-selected', String(!isSignup));
+        $('signup-tab').setAttribute('aria-selected', String(isSignup));
+        $('display-name-field').hidden = !isSignup;
+        $('display-name').required = isSignup;
+        $('auth-submit').textContent = isSignup ? 'Create account' : 'Log in';
+      };
+      $('login-tab').addEventListener('click', () => setAuthMode('login'));
+      $('signup-tab').addEventListener('click', () => setAuthMode('signup'));
+      setAuthMode('login');
       $('auth-form').addEventListener('submit', async (event) => {
         event.preventDefault();
-        const button = event.submitter; button.disabled = true; setStatus('Signing you in…');
-        try { await goToWorkspace(await request('/auth/login', credentials())); }
-        catch (error) { setStatus(error?.detail || 'Unable to sign in.', true); }
+        const button = event.submitter || $('auth-submit'); button.disabled = true;
+        try {
+          if (authMode === 'signup') {
+            setStatus('Creating your account…');
+            await request('/auth/register', { ...credentials(), display_name: $('display-name').value });
+            const tokens = await request('/auth/login', credentials());
+            await goToWorkspace(tokens);
+          } else {
+            setStatus('Signing you in…');
+            await goToWorkspace(await request('/auth/login', credentials()));
+          }
+        } catch (error) {
+          setStatus(error?.detail || (authMode === 'signup' ? 'Unable to create the account.' : 'Unable to sign in.'), true);
+        }
         finally { button.disabled = false; }
       });
     </script>

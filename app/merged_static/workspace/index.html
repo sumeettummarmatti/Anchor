@@ -75,7 +75,7 @@
         <button type="button" role="tab" id="mentor-tab" aria-controls="mentor-panel" aria-selected="true"><span class="nav-icon" aria-hidden="true">⌘</span><span>Coding Mentor</span></button>
         <button type="button" role="tab" id="execution-tab" aria-controls="execution-panel" aria-selected="false"><span class="nav-icon" aria-hidden="true">◈</span><span>Execution Lab</span></button>
         <button type="button" role="tab" id="interview-tab" aria-controls="interview-panel" aria-selected="false"><span class="nav-icon" aria-hidden="true">✦</span><span>Interview Engine</span></button>
-        <button type="button" role="tab" id="analytics-tab" aria-controls="analytics-panel" aria-selected="false"><span class="nav-icon" aria-hidden="true">⌁</span><span>Performance &amp; Analytics</span></button>
+        <button type="button" role="tab" id="analytics-tab" aria-controls="analytics-panel" aria-selected="false"><span class="nav-icon" aria-hidden="true">⌁</span><span>Analytics</span></button>
         </nav>
         <div class="sidebar-bottom">
           <div class="sidebar-controls">
@@ -133,7 +133,6 @@
         panels.forEach((panel) => panel.classList.toggle('active', panel.id === tab.getAttribute('aria-controls')));
         syncFrameThemes();
         tab.focus();
-        if (tab.id === 'analytics-tab') document.getElementById('analytics-frame')?.contentWindow?.location.reload();
       };
       tabs.forEach((tab) => tab.addEventListener('click', () => selectTab(tab)));
       document.getElementById('logout').addEventListener('click', async () => {
