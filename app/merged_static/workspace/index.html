@@ -98,6 +98,7 @@
       const panels = [...document.querySelectorAll('[role="tabpanel"]')];
       let pendingExecutionCode = null;
       let pendingInterviewData = null;
+      let pendingMentorProblem = null;
       let workspaceRefreshPromise = null;
       const refreshWorkspaceSession = async () => {
         const refreshToken = localStorage.getItem('mentor_refresh_token');
@@ -165,6 +166,7 @@
         return response.ok;
       };
       const prepareMentor = async () => {
+        await refreshWorkspaceSession();
         let sessionId = localStorage.getItem('mentor_workspace_session_id');
         if (!(await hasValidLearningSession(sessionId))) sessionId = await createLearningSession();
         const frame = document.getElementById('mentor-frame');
@@ -178,6 +180,44 @@
         if (sessionOutput) sessionOutput.textContent = 'Learning session ready.';
         createRockyButton(documentInFrame);
         syncRockyButton();
+        copyProblemToMentor();
+      };
+      const copyProblemToMentor = () => {
+        if (!pendingMentorProblem) return;
+        const mentorDocument = document.getElementById('mentor-frame').contentDocument;
+        if (!mentorDocument) return;
+        const detail = pendingMentorProblem;
+        const snippets = Array.isArray(detail.code_snippets) ? detail.code_snippets : [];
+        const snippet = snippets.find((item) => /python/i.test(`${item.lang || ''} ${item.lang_slug || ''}`)) || snippets[0];
+        const difficulty = String(detail.difficulty || '').toLowerCase();
+        const workspaceDifficulty = difficulty.includes('easy') || Number(detail.difficulty) <= 2
+          ? 'Easy'
+          : difficulty.includes('hard') || Number(detail.difficulty) >= 5
+            ? 'Hard'
+            : 'Medium';
+        const fields = {
+          'problem-title': detail.title || '',
+          difficulty: workspaceDifficulty,
+          'problem-description': detail.content || 'Problem statement unavailable.',
+          language: detail.language || snippet?.lang_slug || 'python',
+          code: snippet?.code || '',
+          'execution-result': 'Not run',
+        };
+        Object.entries(fields).forEach(([id, value]) => {
+          const field = mentorDocument.getElementById(id);
+          if (!field || value === undefined) return;
+          if (field.tagName === 'SELECT') {
+            const option = [...field.options].find((item) => item.value.toLowerCase() === String(value).toLowerCase() || item.textContent.toLowerCase() === String(value).toLowerCase());
+            if (option) field.value = option.value;
+          } else {
+            field.value = value;
+          }
+          field.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        const status = mentorDocument.getElementById('analysis-status');
+        if (status) status.textContent = `Problem loaded from ${detail.provider || 'the recommendation source'}. Run code when ready.`;
+        mentorDocument.getElementById('problem-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        pendingMentorProblem = null;
       };
       const createRockyButton = (documentInFrame) => {
         let button = documentInFrame.getElementById('rocky-live-toggle');
@@ -236,17 +276,23 @@
       };
       document.getElementById('interview-frame').addEventListener('load', copyInterviewToCoach);
       window.addEventListener('message', (event) => {
-        if (event.origin !== window.location.origin || event.source !== document.getElementById('mentor-frame').contentWindow) return;
-        if (event.data?.type === 'mentor-visualise' && typeof event.data.code === 'string') {
+        if (event.origin !== window.location.origin) return;
+        if (event.source === document.getElementById('mentor-frame').contentWindow && event.data?.type === 'mentor-visualise' && typeof event.data.code === 'string') {
           pendingExecutionCode = event.data.code;
           copyCodeToExecutionLab();
           selectTab(document.getElementById('execution-tab'));
           return;
         }
-        if (event.data?.type === 'mentor-interview' && typeof event.data.code === 'string') {
+        if (event.source === document.getElementById('mentor-frame').contentWindow && event.data?.type === 'mentor-interview' && typeof event.data.code === 'string') {
           pendingInterviewData = event.data;
           copyInterviewToCoach();
           selectTab(document.getElementById('interview-tab'));
+          return;
+        }
+        if (event.source === document.getElementById('analytics-frame').contentWindow && event.data?.type === 'analytics-problem' && event.data.detail) {
+          pendingMentorProblem = event.data.detail;
+          copyProblemToMentor();
+          selectTab(document.getElementById('mentor-tab'));
         }
       });
     </script>

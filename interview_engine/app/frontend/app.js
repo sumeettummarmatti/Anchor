@@ -1,32 +1,34 @@
-const sampleCode = `def find_maximum(numbers):
-    maximum = numbers[0]
-    for number in numbers:
-        if number > maximum:
-            maximum = number
-    print("Maximum:", maximum)
-    return maximum
-
-values = [3, 8, 2, 10, 5]
-result = find_maximum(values)
-print("Result:", result)`;
+const sampleCode = `def two_sum(nums, target):
+    seen = {}
+    for index, value in enumerate(nums):
+        complement = target - value
+        if complement in seen:
+            return [seen[complement], index]
+        seen[value] = index
+    return []`;
 
 const state = { trace: null, stepIndex: 0, playing: false, timer: null, playSpeed: 1, voiceEnabled: true, ttsAvailable: false, recognitionConstructor: null, recognition: null, recognitionActive: false, voiceBaseAnswer: "", voiceFinalTranscript: "", structurePositions: {} };
 const PLAYBACK_BASE_DELAY = 1000;
-const mentorAccessToken = localStorage.getItem("mentor_access_token");
+const mentorAccessToken = () => localStorage.getItem("mentor_access_token");
 const mentorSessionId = localStorage.getItem("mentor_workspace_session_id");
-const mentorGroqApiKey = localStorage.getItem("mentor_groq_api_key");
 function mentorUserId() {
-  if (!mentorAccessToken) return null;
+  const accessToken = mentorAccessToken();
+  if (!accessToken) return null;
   try {
-    const payload = mentorAccessToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = accessToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
     return JSON.parse(atob(payload)).sub || null;
   } catch (_) { return null; }
 }
 const activeUserId = mentorUserId();
-const authHeaders = mentorAccessToken ? { Authorization: `Bearer ${mentorAccessToken}` } : {};
-const llmAuthHeaders = mentorGroqApiKey
-  ? { ...authHeaders, "X-Groq-Api-Key": mentorGroqApiKey }
-  : authHeaders;
+const authHeaders = () => {
+  const accessToken = mentorAccessToken();
+  return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+};
+const llmAuthHeaders = () => {
+  const headers = authHeaders();
+  const groqApiKey = localStorage.getItem("mentor_groq_api_key");
+  return groqApiKey ? { ...headers, "X-Groq-Api-Key": groqApiKey } : headers;
+};
 const $ = (id) => document.getElementById(id);
 function showToast(message) { const toast = $("toast"); toast.textContent = message; toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 2600); }
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c])); }
@@ -44,19 +46,62 @@ function selectStep(index) {
   const vars = Object.entries(step.locals || {}); $("variable-count").textContent = vars.length; $("variables-content").classList.toggle("empty-state", vars.length === 0); $("variables-content").innerHTML = vars.length ? vars.map(([name, value]) => `<div class="variable-row"><span class="variable-name">${escapeHtml(name)}</span><span class="variable-value">${escapeHtml(JSON.stringify(value))}</span></div>`).join("") : "No local variables in this frame"; renderStructure(step, state.trace.steps[state.stepIndex - 1]);
   $("stack-content").innerHTML = step.call_stack?.length ? step.call_stack.slice().reverse().map((frame) => `<div class="stack-frame">${escapeHtml(frame)}()</div>`).join("") : `<div class="empty-state">No active frames</div>`; $("console-output").textContent = step.stdout ? `$ ${step.stdout}` : "$ No output yet"; renderNodes(); loadExplanation(step.step_number);
 }
-async function loadExplanation(stepNumber) { try { const response = await fetch(`/visualization/${state.trace.id}/steps/${stepNumber}`, { headers: llmAuthHeaders }); if (!response.ok) return; const data = await response.json(); if (state.trace.steps[state.stepIndex]?.step_number === stepNumber) { $("ai-explanation").textContent = data.annotation.explanation; $("ai-provider").textContent = data.annotation.provider === "groq" ? "GROQ AI EXPLANATION" : "LOCAL FALLBACK · NO GROQ RESPONSE"; } } catch (_) { $("ai-provider").textContent = "EXPLANATION UNAVAILABLE"; } }
+async function loadExplanation(stepNumber) { try { const response = await fetch(`/visualization/${state.trace.id}/steps/${stepNumber}`, { headers: llmAuthHeaders() }); if (!response.ok) return; const data = await response.json(); if (state.trace.steps[state.stepIndex]?.step_number === stepNumber) { $("ai-explanation").textContent = data.annotation.explanation; $("ai-provider").textContent = data.annotation.provider === "groq" ? "GROQ AI EXPLANATION" : "LOCAL FALLBACK · NO GROQ RESPONSE"; } } catch (_) { $("ai-provider").textContent = "EXPLANATION UNAVAILABLE"; } }
 async function apiErrorMessage(response) { try { const payload = await response.json(); const detail = payload?.detail; if (Array.isArray(detail)) return detail.map((item) => item.msg || JSON.stringify(item)).join("; "); if (detail) return String(detail); } catch (_) { /* The server may have returned a non-JSON error page. */ } return `Request failed (${response.status})`; }
 function renderSummary() { const summary = state.trace.summary; $("summary-flow").textContent = summary?.algorithm_flow || "Run a trace to generate an overview."; $("metric-steps").textContent = summary?.execution_length ?? "—"; $("metric-functions").textContent = summary ? `${(summary.recursion_summary.match(/\d+/) || [0])[0]} calls` : "—"; $("metric-output").textContent = summary?.final_output?.trim() ? "Captured" : "None"; }
 function renderScoreChart(points) { const container = $("score-chart"); if (!points.length) { container.innerHTML = '<div class="empty-state">Complete an interview to see score trends.</div>'; return; } const width = 540; const height = 170; const padding = 28; const values = points.map((point) => Number(point.score) || 0); const min = Math.min(...values); const max = Math.max(...values); const range = Math.max(1, max - min); const coordinates = values.map((value, index) => ({ x: padding + (index * (width - padding * 2)) / Math.max(1, values.length - 1), y: height - padding - ((value - min) / range) * (height - padding * 2) })); const polyline = coordinates.map((point) => `${point.x},${point.y}`).join(" "); const dots = coordinates.map((point, index) => `<circle class="chart-dot" cx="${point.x}" cy="${point.y}" r="4"><title>${escapeHtml(points[index].date)} · ${escapeHtml(points[index].score)}</title></circle>`).join(""); container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Interview score trend"><line class="chart-grid" x1="${padding}" y1="${padding}" x2="${width - padding}" y2="${padding}"></line><line class="chart-grid" x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}"></line><polyline class="chart-line" points="${polyline}"></polyline>${dots}<text x="${padding}" y="${height - 7}">${escapeHtml(points[0].date)}</text><text x="${width - padding}" y="${height - 7}" text-anchor="end">${escapeHtml(points[points.length - 1].date)}</text><text x="${padding}" y="${padding - 8}">${escapeHtml(String(max))}</text><text x="${padding}" y="${height - padding - 8}">${escapeHtml(String(min))}</text></svg>`; }
 function renderLanguageChart(languages) { const container = $("language-chart"); const entries = Object.entries(languages || {}).sort((a, b) => b[1] - a[1]); if (!entries.length) { container.innerHTML = '<div class="empty-state">Run a trace or interview to see language activity.</div>'; return; } const maximum = Math.max(...entries.map(([, count]) => count)); container.innerHTML = entries.map(([language, count]) => `<div class="analytics-bar-row"><span>${escapeHtml(language)}</span><div class="analytics-bar-track"><div class="analytics-bar-fill" style="width:${(count / maximum) * 100}%"></div></div><strong>${count}</strong></div>`).join(""); }
 function renderActivity(events) { const container = $("activity-list"); if (!events?.length) { container.innerHTML = '<div class="empty-state">No learning events yet.</div>'; return; } container.innerHTML = events.map((event) => { const date = new Date(event.timestamp); return `<div class="activity-row"><span class="activity-type">${escapeHtml(event.event_type.replaceAll("_", " "))}</span><span class="activity-source">${escapeHtml(event.source)}</span><span class="activity-time">${escapeHtml(Number.isNaN(date.getTime()) ? event.timestamp : date.toLocaleString())}</span></div>`; }).join(""); }
-function renderRecommendations(items) { const container = $("recommendations-list"); if (!items?.length) { container.innerHTML = '<div class="empty-state">Complete activity to get recommendations.</div>'; return; } container.innerHTML = items.map((item) => `<div class="recommendation-item"><span aria-hidden="true">✦</span>${escapeHtml(item)}</div>`).join(""); }
-function renderAnalytics(data) { const totals = data.totals || {}; const snapshot = data.snapshot || {}; const progress = data.progress || {}; $("analytics-interviews").textContent = totals.completed_interviews ?? 0; $("analytics-problems").textContent = totals.total_problems_solved ?? 0; $("analytics-score").textContent = snapshot.average_score == null ? "—" : snapshot.average_score; $("analytics-active-days").textContent = progress.active_days_30d ?? 0; $("analytics-score-change").textContent = progress.score_change == null ? "No trend" : `${progress.score_change >= 0 ? "+" : ""}${progress.score_change}`; $("analytics-event-count").textContent = `${totals.total_events ?? 0} events`; $("analytics-status").textContent = snapshot.last_active ? `Last active ${new Date(snapshot.last_active).toLocaleString()}` : "No activity yet"; renderRecommendations(data.recommendations || []); renderScoreChart(data.scores_by_date || []); renderLanguageChart(data.language_distribution || {}); renderActivity(data.recent_activity || []); }
+function renderProblemRecommendations(items) {
+  const container = $("recommendations-list");
+  if (!Array.isArray(items) || !items.length) {
+    container.innerHTML = '<div class="empty-state">No recommendations are available yet.</div>';
+    return;
+  }
+  container.innerHTML = items.map((item) => {
+    const tags = (Array.isArray(item.topic_tags) ? item.topic_tags : [])
+      .map((tag) => `<span class="count-badge">${escapeHtml(tag)}</span>`)
+      .join("");
+    const source = item.source === "bi_encoder" ? "Bi-encoder match" : "Rule-based fallback";
+    const score = Number.isFinite(Number(item.score)) ? Number(item.score).toFixed(3) : "n/a";
+    const title = `<button type="button" class="recommendation-link recommendation-detail-link" data-problem-id="${escapeHtml(item.id)}">${escapeHtml(item.title)}</button>`;
+    return `<article class="recommendation-card"><div><span class="count-badge">Difficulty ${escapeHtml(item.difficulty)}/5</span><span class="count-badge">${escapeHtml(source)}</span></div><h3>${title}</h3><p class="muted">${escapeHtml(item.provider || "GitHub · Garvit244/Leetcode")}</p><div class="recommendation-tags">${tags || '<span class="muted">General practice</span>'}</div><p class="recommendation-score">Match score: ${escapeHtml(score)}</p></article>`;
+  }).join("");
+  container.querySelectorAll("[data-problem-id]").forEach((button) => button.addEventListener("click", () => loadProblemIntoMentor(button.dataset.problemId)));
+}
+async function loadProblemRecommendations() {
+  const button = $("recommend");
+  if (button) button.disabled = true;
+  try {
+    const response = await fetch("/problems/recommended?k=5", { headers: authHeaders() });
+    if (!response.ok) throw new Error(await apiErrorMessage(response));
+    renderProblemRecommendations(await response.json());
+  } catch (error) {
+    $("recommendations-list").innerHTML = '<div class="empty-state">Recommendations are unavailable right now.</div>';
+    console.error(error);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+async function loadProblemIntoMentor(problemId) {
+  $("analytics-status").textContent = "Loading the selected problem into Coding Mentor…";
+  try {
+    const response = await fetch(`/problems/details/${encodeURIComponent(problemId)}`, { headers: authHeaders() });
+    if (!response.ok) throw new Error(await apiErrorMessage(response));
+    const detail = await response.json();
+    window.parent.postMessage({ type: "analytics-problem", detail }, window.location.origin);
+    $("analytics-status").textContent = `${detail.title} loaded into Coding Mentor.`;
+  } catch (error) {
+    $("analytics-status").textContent = error.message || "Unable to load this problem right now.";
+    console.error(error);
+  }
+}
+function renderAnalytics(data) { const totals = data.totals || {}; const snapshot = data.snapshot || {}; const progress = data.progress || {}; $("analytics-interviews").textContent = totals.completed_interviews ?? 0; $("analytics-problems").textContent = totals.total_problems_solved ?? 0; $("analytics-score").textContent = snapshot.average_score == null ? "—" : snapshot.average_score; $("analytics-active-days").textContent = progress.active_days_30d ?? 0; $("analytics-score-change").textContent = progress.score_change == null ? "No trend" : `${progress.score_change >= 0 ? "+" : ""}${progress.score_change}`; $("analytics-event-count").textContent = `${totals.total_events ?? 0} events`; $("analytics-status").textContent = snapshot.last_active ? `Last active ${new Date(snapshot.last_active).toLocaleString()}` : "No activity yet"; renderScoreChart(data.scores_by_date || []); renderLanguageChart(data.language_distribution || {}); renderActivity(data.recent_activity || []); }
 async function loadAnalyticsUser() {
   const userElement = $("analytics-user");
   userElement.textContent = "Loading account details…";
   try {
-    const response = await fetch("/users/me", { headers: authHeaders });
+    const response = await fetch("/users/me", { headers: authHeaders() });
     if (!response.ok) throw new Error(await response.text());
     const user = await response.json();
     const email = user.email || "unknown email";
@@ -67,7 +112,7 @@ async function loadAnalyticsUser() {
     console.error(error);
   }
 }
-async function loadAnalytics() { loadAnalyticsUser(); $("analytics-status").textContent = "Loading your learning activity…"; try { const response = await fetch("/analytics/me", { headers: authHeaders }); if (!response.ok) throw new Error(await response.text()); renderAnalytics(await response.json()); } catch (error) { $("analytics-status").textContent = "Analytics unavailable — run the API and try again."; console.error(error); } }
+async function loadAnalytics() { loadAnalyticsUser(); $("analytics-status").textContent = "Loading your learning activity…"; try { const response = await fetch("/analytics/me", { headers: authHeaders() }); if (!response.ok) throw new Error(await response.text()); renderAnalytics(await response.json()); await loadProblemRecommendations(); } catch (error) { $("analytics-status").textContent = "Analytics unavailable — run the API and try again."; console.error(error); } }
 function isSnapshotRef(value) { return value && typeof value === "object" && Number.isInteger(value.__ref__); }
 function isPrimitiveSnapshot(value) { return value === null || ["string", "number", "boolean"].includes(typeof value); }
 function structureValues(step) { return Object.entries({ ...(step?.globals || {}), ...(step?.locals || {}) }); }
@@ -121,7 +166,7 @@ function renderStructure(step, previousStep) {
   const shape = structureShape(current); const layout = layoutStructure(current, shape); const active = changedStructureRefs(current, previous); const nodeWidth = 112; const nodeHeight = 48; const edgeSvg = current.edges.map((edge) => { const from = layout.positions.get(edge.from); const to = layout.positions.get(edge.to); if (!from || !to) return ""; return `<line class="structure-edge" x1="${from.x}" y1="${from.y + nodeHeight / 2}" x2="${to.x}" y2="${to.y - nodeHeight / 2}" marker-end="url(#structure-arrow)"></line>`; }).join(""); const nodeSvg = [...current.nodes.values()].map((node) => { const position = layout.positions.get(node.id); if (!position) return ""; const previousPosition = state.structurePositions[node.id] || position; const animation = previousPosition.x !== position.x || previousPosition.y !== position.y ? `<animateTransform attributeName="transform" type="translate" from="${previousPosition.x} ${previousPosition.y}" to="${position.x} ${position.y}" dur="240ms" fill="freeze"></animateTransform>` : ""; return `<g class="structure-node ${active.has(node.id) ? "active" : ""}" transform="translate(${position.x} ${position.y})"><rect x="${-nodeWidth / 2}" y="${-nodeHeight / 2}" width="${nodeWidth}" height="${nodeHeight}" rx="7"></rect><text class="structure-node-type" x="0" y="-5" text-anchor="middle">${escapeHtml(node.type)}</text><text class="structure-node-value" x="0" y="14" text-anchor="middle">${escapeHtml(structureNodeLabel(node))}</text>${animation}</g>`; }).join(""); $("structure-svg").setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`); $("structure-svg").innerHTML = `<defs><marker id="structure-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z"></path></marker></defs>${edgeSvg}${nodeSvg}`; $("structure-shape").textContent = shape; $("structure-empty").classList.add("hidden"); state.structurePositions = Object.fromEntries([...layout.positions.entries()]); }
 async function runTrace() {
   const code = $("source-code").value.trim(); if (!code) return showToast("Add some Python code first"); stopPlayback(); const button = $("run-button"); button.disabled = true; button.textContent = "Running…"; $("source-status").textContent = "Tracing execution…";
-  try { const created = await fetch("/visualization/trace", { method: "POST", headers: { ...llmAuthHeaders, "Content-Type": "application/json" }, body: JSON.stringify({ language: "python", source_code: code }) }); if (!created.ok) throw new Error(await apiErrorMessage(created)); const { trace_id } = await created.json(); const response = await fetch(`/visualization/${trace_id}`, { headers: authHeaders }); if (!response.ok) throw new Error(await apiErrorMessage(response)); state.trace = await response.json(); state.stepIndex = 0; state.structurePositions = {}; $("trace-id").textContent = trace_id; $("source-status").textContent = `${state.trace.steps.length} execution steps captured`; renderSummary(); selectStep(0); showToast("Trace ready to replay"); } catch (error) { const message = error instanceof TypeError ? "Could not reach the API — is the server running?" : `Trace rejected: ${error.message}`; showToast(message); $("source-status").textContent = message; console.error(error); } finally { button.disabled = false; button.textContent = "▶ Run trace"; }
+  try { const created = await fetch("/visualization/trace", { method: "POST", headers: { ...llmAuthHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ language: "python", source_code: code }) }); if (!created.ok) throw new Error(await apiErrorMessage(created)); const { trace_id } = await created.json(); const response = await fetch(`/visualization/${trace_id}`, { headers: authHeaders() }); if (!response.ok) throw new Error(await apiErrorMessage(response)); state.trace = await response.json(); state.stepIndex = 0; state.structurePositions = {}; $("trace-id").textContent = trace_id; $("source-status").textContent = `${state.trace.steps.length} execution steps captured`; renderSummary(); selectStep(0); showToast("Trace ready to replay"); } catch (error) { const message = error instanceof TypeError ? "Could not reach the API — is the server running?" : `Trace rejected: ${error.message}`; showToast(message); $("source-status").textContent = message; console.error(error); } finally { button.disabled = false; button.textContent = "▶ Run trace"; }
 }
 function stopPlayback() { if (state.timer !== null) { clearInterval(state.timer); state.timer = null; } state.playing = false; $("play-button").textContent = "▶"; }
 function startPlaybackTimer() { if (!state.trace) return; if (state.timer !== null) clearInterval(state.timer); state.timer = setInterval(() => { if (state.stepIndex >= state.trace.steps.length - 1) return stopPlayback(); selectStep(state.stepIndex + 1); }, PLAYBACK_BASE_DELAY / state.playSpeed); }
@@ -171,17 +216,17 @@ const embeddedParams = new URLSearchParams(window.location.search);
 const embeddedView = embeddedParams.get("view");
 if (["lab", "interview", "analytics"].includes(embeddedView)) setView(embeddedView);
 if (embeddedParams.get("merged") === "1") document.querySelector(".sidebar")?.remove();
-$("source-code").value = ""; syncEditor(); $("load-example-button").addEventListener("click", () => { $("source-code").value = sampleCode; syncEditor(); $("source-status").textContent = "Example loaded — edit it freely"; });
+$("source-code").value = sampleCode; syncEditor(); $("load-example-button").addEventListener("click", () => { $("source-code").value = sampleCode; syncEditor(); $("source-status").textContent = "Example loaded — edit it freely"; });
 
 let interviewId = null;
 function addInterviewMessage(role, content) { const box = $("interview-messages"); if (box.querySelector(".empty-state")) box.innerHTML = ""; const item = document.createElement("div"); item.className = `message ${role === "AI" ? "ai" : "user"}`; item.innerHTML = `<span class="message-label">${role}</span>${escapeHtml(content).replace(/\n/g, "<br>")}`; box.appendChild(item); box.scrollTop = box.scrollHeight; if (role === "AI") speakInterviewMessage(content); }
 async function startInterview() {
   if (!activeUserId) return showToast("Sign in to start an interview");
   const payload = { context: { submission_id: mentorSessionId || `ui-${Date.now()}`, user_id: activeUserId, problem_title: $("interview-title").value, problem_description: $("interview-description").value, language: $("interview-language").value, code: $("interview-code").value, execution_result: $("interview-execution").value, hint_count: 0, attempt_count: 1, difficulty: $("interview-difficulty").value }, style: "Friendly" };
-  try { const response = await fetch("/interview/start", { method: "POST", headers: { ...llmAuthHeaders, "Content-Type": "application/json" }, body: JSON.stringify(payload) }); if (!response.ok) throw new Error(await response.text()); const data = await response.json(); interviewId = data.interview_id; $("interview-messages").innerHTML = ""; $("interview-state").textContent = "WAITING FOR ANSWER"; addInterviewMessage("AI", data.first_question); showToast("Interview started"); } catch (error) { showToast("Could not start interview"); console.error(error); }
+  try { const response = await fetch("/interview/start", { method: "POST", headers: { ...llmAuthHeaders(), "Content-Type": "application/json" }, body: JSON.stringify(payload) }); if (!response.ok) throw new Error(await response.text()); const data = await response.json(); interviewId = data.interview_id; $("interview-messages").innerHTML = ""; $("interview-state").textContent = "WAITING FOR ANSWER"; addInterviewMessage("AI", data.first_question); showToast("Interview started"); } catch (error) { showToast("Could not start interview"); console.error(error); }
 }
-async function submitInterviewAnswer() { if (!interviewId) return showToast("Start an interview first"); const answer = $("interview-answer").value.trim(); if (!answer) return showToast("Write an answer first"); stopVoiceInput(); try { const response = await fetch(`/interview/${interviewId}/answer`, { method: "POST", headers: { ...llmAuthHeaders, "Content-Type": "application/json" }, body: JSON.stringify({ answer }) }); if (!response.ok) throw new Error(await apiErrorMessage(response)); const data = await response.json(); addInterviewMessage("USER", answer); $("interview-answer").value = ""; const score = data.evaluation; addInterviewMessage("AI", `Evaluation — technical ${score.technical_accuracy}/10, communication ${score.communication}/10, complexity ${score.complexity_understanding}/10, edge cases ${score.edge_case_reasoning}/10. ${score.feedback}`); addInterviewMessage("AI", data.next_question || "That completes the planned questions. You can finish the interview now."); $("interview-state").textContent = data.next_question ? "FOLLOW-UP READY" : "COMPLETED"; if (!data.next_question) { $("submit-answer").disabled = true; stopVoiceInput(); } } catch (error) { showToast(`Could not submit answer: ${error.message || "please try again"}`); console.error(error); } }
-async function finishInterview() { if (!interviewId) return showToast("Start an interview first"); stopVoiceInput(); try { const response = await fetch(`/interview/${interviewId}/finish`, { method: "POST", headers: llmAuthHeaders }); if (!response.ok) throw new Error(await response.text()); const report = await response.json(); $("interview-state").textContent = "REPORT READY"; const panel = $("interview-report"); panel.classList.remove("hidden"); panel.innerHTML = `<h2>Interview report</h2><p>${escapeHtml(report.summary)}</p><div class="report-grid"><div><span class="section-kicker">OVERALL SCORE</span><strong>${report.overall_score}/10</strong></div><div><span class="section-kicker">STRENGTHS</span><p>${escapeHtml(report.strengths.join(", "))}</p></div><div><span class="section-kicker">NEXT TOPICS</span><p>${escapeHtml(report.recommended_topics.join(", "))}</p></div></div>`; } catch (error) { showToast("Could not finish interview"); console.error(error); } }
-$("start-interview").addEventListener("click", startInterview); $("give-answer").addEventListener("click", giveInterviewAnswer); $("next-question").addEventListener("click", requestNextQuestion); $("submit-answer").addEventListener("click", submitInterviewAnswer); $("finish-interview").addEventListener("click", finishInterview); $("analytics-refresh").addEventListener("click", loadAnalytics);
-async function giveInterviewAnswer() { if (!interviewId) return showToast("Start an interview first"); const button = $("give-answer"); button.disabled = true; button.textContent = "Writing…"; try { const response = await fetch(`/interview/${interviewId}/answer-example`, { method: "POST", headers: llmAuthHeaders }); if (!response.ok) throw new Error(await apiErrorMessage(response)); const data = await response.json(); addInterviewMessage("AI", `Reference answer — ${data.answer}`); showToast("Reference answer shown in the conversation"); } catch (error) { showToast(`Could not generate an answer: ${error.message || "please try again"}`); console.error(error); } finally { button.disabled = false; button.textContent = "Give answer"; } }
-async function requestNextQuestion() { if (!interviewId) return showToast("Start an interview first"); const button = $("next-question"); button.disabled = true; try { const response = await fetch(`/interview/${interviewId}/next-question`, { method: "POST", headers: llmAuthHeaders }); if (!response.ok) throw new Error(await apiErrorMessage(response)); const data = await response.json(); $("interview-answer").value = ""; if (data.next_question) { addInterviewMessage("AI", data.next_question); $("interview-state").textContent = "WAITING FOR ANSWER"; } else { $("interview-state").textContent = "COMPLETED"; $("submit-answer").disabled = true; button.disabled = true; addInterviewMessage("AI", "There are no more planned questions. You can finish the interview now."); } } catch (error) { showToast(`Could not get the next question: ${error.message || "please try again"}`); button.disabled = false; console.error(error); } }
+async function submitInterviewAnswer() { if (!interviewId) return showToast("Start an interview first"); const answer = $("interview-answer").value.trim(); if (!answer) return showToast("Write an answer first"); stopVoiceInput(); try { const response = await fetch(`/interview/${interviewId}/answer`, { method: "POST", headers: { ...llmAuthHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ answer }) }); if (!response.ok) throw new Error(await apiErrorMessage(response)); const data = await response.json(); addInterviewMessage("USER", answer); $("interview-answer").value = ""; const score = data.evaluation; addInterviewMessage("AI", `Evaluation — technical ${score.technical_accuracy}/10, communication ${score.communication}/10, complexity ${score.complexity_understanding}/10, edge cases ${score.edge_case_reasoning}/10. ${score.feedback}`); addInterviewMessage("AI", data.next_question || "That completes the planned questions. You can finish the interview now."); $("interview-state").textContent = data.next_question ? "FOLLOW-UP READY" : "COMPLETED"; if (!data.next_question) { $("submit-answer").disabled = true; stopVoiceInput(); } } catch (error) { showToast(`Could not submit answer: ${error.message || "please try again"}`); console.error(error); } }
+async function finishInterview() { if (!interviewId) return showToast("Start an interview first"); stopVoiceInput(); try { const response = await fetch(`/interview/${interviewId}/finish`, { method: "POST", headers: llmAuthHeaders() }); if (!response.ok) throw new Error(await apiErrorMessage(response)); const report = await response.json(); $("interview-state").textContent = "REPORT READY"; const panel = $("interview-report"); panel.classList.remove("hidden"); panel.innerHTML = `<h2>Interview report</h2><p>${escapeHtml(report.summary)}</p><div class="report-grid"><div><span class="section-kicker">OVERALL SCORE</span><strong>${report.overall_score}/10</strong></div><div><span class="section-kicker">STRENGTHS</span><p>${escapeHtml(report.strengths.join(", "))}</p></div><div><span class="section-kicker">NEXT TOPICS</span><p>${escapeHtml(report.recommended_topics.join(", "))}</p></div></div>`; } catch (error) { showToast(`Could not finish interview: ${error.message || "submit an answer first"}`); console.error(error); } }
+$("start-interview").addEventListener("click", startInterview); $("give-answer").addEventListener("click", giveInterviewAnswer); $("next-question").addEventListener("click", requestNextQuestion); $("submit-answer").addEventListener("click", submitInterviewAnswer); $("finish-interview").addEventListener("click", finishInterview); $("analytics-refresh").addEventListener("click", loadAnalytics); $("recommend").addEventListener("click", loadProblemRecommendations);
+async function giveInterviewAnswer() { if (!interviewId) return showToast("Start an interview first"); const button = $("give-answer"); button.disabled = true; button.textContent = "Writing…"; try { const response = await fetch(`/interview/${interviewId}/answer-example`, { method: "POST", headers: llmAuthHeaders() }); if (!response.ok) throw new Error(await apiErrorMessage(response)); const data = await response.json(); addInterviewMessage("AI", `Reference answer — ${data.answer}`); showToast("Reference answer shown in the conversation"); } catch (error) { showToast(`Could not generate an answer: ${error.message || "please try again"}`); console.error(error); } finally { button.disabled = false; button.textContent = "Give answer"; } }
+async function requestNextQuestion() { if (!interviewId) return showToast("Start an interview first"); const button = $("next-question"); button.disabled = true; try { const response = await fetch(`/interview/${interviewId}/next-question`, { method: "POST", headers: llmAuthHeaders() }); if (!response.ok) throw new Error(await apiErrorMessage(response)); const data = await response.json(); $("interview-answer").value = ""; if (data.next_question) { addInterviewMessage("AI", data.next_question); $("interview-state").textContent = "WAITING FOR ANSWER"; } else { $("interview-state").textContent = "COMPLETED"; $("submit-answer").disabled = true; button.disabled = true; addInterviewMessage("AI", "There are no more planned questions. You can finish the interview now."); } } catch (error) { showToast(`Could not get the next question: ${error.message || "please try again"}`); button.disabled = false; console.error(error); } }

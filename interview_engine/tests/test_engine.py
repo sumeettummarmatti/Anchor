@@ -22,6 +22,74 @@ def test_creation_and_transitions():
     with pytest.raises(ValueError, match="Invalid transition"):
         service.transition(interview, InterviewState.CREATED)
 
+def test_finishing_without_answers_is_rejected():
+    service = InterviewService(InMemoryInterviewRepository())
+    interview = service.start(request())
+
+    with pytest.raises(ValueError, match="Submit at least one answer"):
+        service.finish(interview.id)
+
+    assert service.require(interview.id).state == InterviewState.WAITING_FOR_ANSWER
+
+def test_empty_report_never_calls_llm_or_receives_a_score():
+    class ExplodingLLM:
+        def complete_json(self, system, user):
+            raise AssertionError("The LLM must not score an empty interview")
+
+    report = ReportGenerator(ExplodingLLM()).generate("empty", [], {"difficulty": "Easy"})
+
+    assert report.overall_score == 0.0
+    assert "no answers were submitted" in report.summary.lower()
+
+
+def test_no_knowledge_report_stays_zero_even_when_llm_is_configured():
+    class ExplodingLLM:
+        def complete_json(self, system, user):
+            raise AssertionError("The LLM must not upgrade an explicit no-knowledge answer")
+
+    evaluation = {
+        "technical_accuracy": 0,
+        "communication": 0,
+        "complexity_understanding": 0,
+        "edge_case_reasoning": 0,
+        "confidence": 0,
+    }
+    report = ReportGenerator(ExplodingLLM()).generate(
+        "no-knowledge", [evaluation], {"difficulty": "Easy"}
+    )
+
+    assert report.overall_score == 0.0
+    assert "0/10" in report.summary
+
+
+def test_report_score_uses_answer_evaluations_not_llm_score():
+    class OverconfidentReportLLM:
+        def complete_json(self, system, user):
+            return {
+                "interview_id": "ignored",
+                "overall_score": 8,
+                "strengths": ["A clear solution"],
+                "weaknesses": [],
+                "communication_feedback": "Good communication.",
+                "recommended_topics": [],
+                "improvement_plan": [],
+                "summary": "The candidate scored 8/10.",
+            }
+
+    evaluation = {
+        "technical_accuracy": 4,
+        "communication": 4,
+        "complexity_understanding": 4,
+        "edge_case_reasoning": 4,
+        "confidence": 4,
+    }
+    report = ReportGenerator(OverconfidentReportLLM()).generate(
+        "authoritative-score", [evaluation], {"difficulty": "Easy"}
+    )
+
+    assert report.overall_score == 4.0
+
+
 def test_answer_and_report_generation():
     service = InterviewService(InMemoryInterviewRepository())
     interview = service.start(request())
@@ -59,6 +127,18 @@ class AuthFailLLM:
     def complete_json(self, system, user):
         raise LLMAuthError("simulated provider authentication failure")
 
+
+class StructuredQuestionLLM:
+    def complete_json(self, system, user):
+        return {
+            "questions": [
+                {"question": "Walk through the approach."},
+                {"question": "What is the time complexity?"},
+                {"question": "Which edge cases matter?"},
+            ]
+        }
+
+
 class ThreeQuestionPlanner:
     def create_plan(self, context, company=None, style="Friendly"): return ["Planned Q1", "Planned Q2", "Planned Q3"]
 
@@ -95,6 +175,24 @@ def test_interview_answer_uses_fallbacks_when_the_model_is_unavailable():
     interview = service.start(request())
     evaluation, _ = service.answer(interview.id, "I would use a hash map and explain the lookup trade-off.")
     assert evaluation.technical_accuracy > 0
+
+
+def test_planner_unwraps_structured_questions_before_display():
+    questions = Planner(StructuredQuestionLLM()).create_plan(
+        {
+            "problem_title": "Two Sum",
+            "problem_description": "Find a pair",
+            "difficulty": "Easy",
+            "code": "def two_sum(nums, target):\n    pass",
+        }
+    )
+
+    assert questions == [
+        "Walk through the approach.",
+        "What is the time complexity?",
+        "Which edge cases matter?",
+    ]
+
 
 def test_followup_fallback_uses_different_context_templates():
     from interview_engine.app.interview.services.followup_generator import FollowupGenerator

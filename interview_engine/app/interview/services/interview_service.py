@@ -157,9 +157,11 @@ class InterviewService:
     def _finish_locked(self, interview_id, llm=None):
         interview = self.require(interview_id)
         if interview.state not in (InterviewState.COMPLETED, InterviewState.WAITING_FOR_ANSWER, InterviewState.FOLLOW_UP): raise ValueError("Interview cannot be finished in its current state")
+        evaluations = self.repository.get_evaluations(interview.id)
+        if not evaluations: raise ValueError("Submit at least one answer before finishing the interview")
         interview.completed_at = interview.completed_at or datetime.now(timezone.utc); interview.state = InterviewState.COMPLETED; self.repository.save(interview)
         reports = ReportGenerator(llm) if llm is not None else self.reports
-        report = reports.generate(interview.id, [x.evaluation for x in self.repository.get_evaluations(interview.id)], interview.context)
+        report = reports.generate(interview.id, [x.evaluation for x in evaluations], interview.context)
         self.repository.save_report(StoredInterviewReport(interview.id, report.model_dump())); self.transition(interview, InterviewState.REPORT_GENERATED)
         self.event_publisher.publish(
             event_type="INTERVIEW_COMPLETED",

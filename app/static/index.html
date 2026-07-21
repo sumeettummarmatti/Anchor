@@ -41,6 +41,8 @@
       .recommendation-card h3 { margin: 12px 0 8px; font-size: .92rem; overflow-wrap: anywhere; }
       .recommendation-link { color: var(--text-heading); text-decoration: none; }
       .recommendation-link:hover { color: var(--accent-secondary); text-decoration: underline; }
+      .recommendation-detail-link { display: block; width: 100%; min-width: 0; margin: 0; padding: 0; border: 0; background: transparent; color: var(--text-heading); font: inherit; line-height: 1.35; text-align: left; white-space: normal; overflow-wrap: anywhere; box-shadow: none; }
+      .recommendation-detail-link:hover { color: var(--accent-secondary); text-decoration: underline; filter: none; }
       .recommendation-card .pill { margin: 0 4px 4px 0; }
       .recommendation-tags { display: flex; flex-wrap: wrap; gap: 4px; }
       .recommendation-tags .pill { margin: 0; background: rgba(45, 212, 191, .1); color: var(--text-body); font-weight: 600; }
@@ -139,18 +141,6 @@
           <pre id="session-output">No session yet.</pre>
         </form>
 
-        <section class="card wide" id="recommendations-card">
-          <div class="recommendation-header">
-            <div>
-              <h2>Recommended problems</h2>
-              <p class="hint">Recommendations use your learner profile and recent performance history.</p>
-            </div>
-            <button type="button" id="recommend">Refresh recommendations</button>
-          </div>
-          <p id="recommendation-status" class="hint" role="status">Sign in to load recommendations.</p>
-          <div id="recommendation-output" class="recommendation-list" aria-live="polite"></div>
-        </section>
-
         <section class="card wide">
           <h2>Code workspace</h2>
           <div class="row">
@@ -169,12 +159,14 @@
           <select id="language"><option value="python">Python</option></select>
           <p class="hint">Python analysis uses Ruff. Execution uses your local Piston service.</p>
           <label for="code">Code</label>
-          <textarea id="code">import os
-
-def greet(name):
-    return f"Hello, {name}!"
-
-print(greet("learner"))</textarea>
+          <textarea id="code">def two_sum(nums, target):
+    seen = {}
+    for index, value in enumerate(nums):
+        complement = target - value
+        if complement in seen:
+            return [seen[complement], index]
+        seen[value] = index
+    return []</textarea>
           <label for="execution-result">Execution result</label>
           <input id="execution-result" value="Not run" readonly />
           <div class="actions">
@@ -372,7 +364,6 @@ print(greet("learner"))</textarea>
           localStorage.setItem('mentor_access_token', tokens.access_token);
           localStorage.setItem('mentor_refresh_token', tokens.refresh_token);
           $('auth-state').textContent = 'Logged in. Access and refresh tokens stored locally.';
-          loadRecommendations();
         } catch (error) { showError(error, $('auth-state')); }
       });
       $('profile').addEventListener('click', async () => {
@@ -430,6 +421,38 @@ print(greet("learner"))</textarea>
           await checkStuckScore(sessionId);
         } catch (error) { showError(error, output); }
       });
+      const loadProblemIntoWorkspace = (detail) => {
+        const asText = (value) => {
+          const parsed = new DOMParser().parseFromString(String(value || ''), 'text/html');
+          return (parsed.body.textContent || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+        };
+        const difficulty = String(detail.difficulty || '').toLowerCase();
+        const workspaceDifficulty = difficulty.includes('easy') || Number(detail.difficulty) <= 2
+          ? 'Easy'
+          : difficulty.includes('hard') || Number(detail.difficulty) >= 5
+            ? 'Hard'
+            : 'Medium';
+        const snippets = Array.isArray(detail.code_snippets) ? detail.code_snippets : [];
+        const snippet = snippets.find((item) => /python/i.test(`${item.lang || ''} ${item.lang_slug || ''}`)) || snippets[0];
+        const language = String(detail.language || snippet?.lang_slug || '').toLowerCase();
+        const languageOption = [...$('language').options].find((option) => option.value.toLowerCase() === language || option.textContent.toLowerCase() === language);
+        $('problem-title').value = detail.title || '';
+        $('difficulty').value = workspaceDifficulty;
+        $('problem-description').value = asText(detail.content) || 'Problem statement unavailable.';
+        if (languageOption) $('language').value = languageOption.value;
+        if (snippet?.code) $('code').value = snippet.code;
+        $('execution-result').value = 'Not run';
+        $('analysis-status').textContent = `Problem loaded from ${detail.provider || 'the recommendation source'}. Run code when ready.`;
+        $('problem-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+      const loadProblemDetails = async (problemId) => {
+        try {
+          const detail = await request(`/problems/details/${encodeURIComponent(problemId)}`, { headers: authHeaders() });
+          loadProblemIntoWorkspace(detail);
+        } catch (error) {
+          $('analysis-status').textContent = error?.detail || 'Unable to load this problem right now.';
+        }
+      };
       const renderRecommendations = (recommendations) => {
         const target = $('recommendation-output');
         if (!target) return;
@@ -445,14 +468,16 @@ print(greet("learner"))</textarea>
           const score = Number.isFinite(Number(recommendation.score))
             ? Number(recommendation.score).toFixed(3)
             : 'n/a';
+          const title = `<button type="button" class="recommendation-link recommendation-detail-link" data-problem-id="${escapeHtml(recommendation.id)}">${escapeHtml(recommendation.title)}</button>`;
           return `<article class="recommendation-card">
             <div><span class="pill">Difficulty ${escapeHtml(recommendation.difficulty)}/5</span><span class="pill">${escapeHtml(source)}</span></div>
-            <h3>${recommendation.url ? `<a class="recommendation-link" href="${escapeHtml(recommendation.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(recommendation.title)}</a>` : escapeHtml(recommendation.title)}</h3>
-            <p class="hint">${escapeHtml(recommendation.provider || 'Synthetic catalog')}</p>
+            <h3>${title}</h3>
+            <p class="hint">${escapeHtml(recommendation.provider || 'GitHub · Garvit244/Leetcode')}</p>
             <div class="recommendation-tags">${tags || '<span class="hint">General practice</span>'}</div>
             <p class="recommendation-score">Match score: ${escapeHtml(score)}</p>
           </article>`;
         }).join('');
+        target.querySelectorAll('[data-problem-id]').forEach((button) => button.addEventListener('click', () => loadProblemDetails(button.dataset.problemId)));
       };
       const loadRecommendations = async () => {
         const button = $('recommend');
@@ -471,7 +496,6 @@ print(greet("learner"))</textarea>
           if (button) button.disabled = false;
         }
       };
-      $('recommend').addEventListener('click', loadRecommendations);
       const explainExecution = async (execution, sessionId) => {
         const explanationOutput = $('explanation-output');
         const diagnostics = execution?.static_analysis?.diagnostics || [];
@@ -762,7 +786,6 @@ print(greet("learner"))</textarea>
       setInterval(checkLLMStatus, 15000);
       if (token()) {
         $('auth-state').textContent = 'An access token is already stored in this browser.';
-        loadRecommendations();
       }
     </script>
   </body>

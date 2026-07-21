@@ -29,6 +29,25 @@ def fallback_code_questions(context: dict) -> List[str]:
         f"What alternative approach could replace the strategy in {reference}, and what trade-off would that introduce?",
     ]
 
+
+def question_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, dict):
+        for field in ("question", "text", "prompt"):
+            candidate = value.get(field)
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate.strip()
+        return ""
+    return str(value).strip()
+
+
+def normalized_questions(values: Any) -> List[str]:
+    if not isinstance(values, list):
+        return []
+    return [text for text in (question_text(value) for value in values[:5]) if text]
+
+
 class Planner:
     def __init__(self, llm: Optional[LLMClient] = None): self.llm = llm
     def create_plan(self, context: Any, company: Optional[str] = None, style: str = "Friendly") -> List[str]:
@@ -36,13 +55,13 @@ class Planner:
         if self.llm:
             try:
                 result = complete_json_with_retry(self.llm, "Create a technical interview plan from the submitted source code. Return JSON with a questions array of exactly five concise questions. Keep every question grounded in source_code, but cover these general interview dimensions in order: overall approach, chosen data structures and invariants, time and space complexity, edge cases, and an alternative approach with trade-offs. Refer to concrete code details where useful; do not produce unrelated generic questions.", str({"problem": data["problem_title"], "description": data["problem_description"], "difficulty": data["difficulty"], "source_code": data["code"], "company": company, "style": style, "execution_status": data.get("execution_status"), "struggle_indicators": data.get("struggle_indicators", [])}), "planner")
-                questions = result.get("questions", [])
-                if isinstance(questions, list) and len(questions) >= 3: return [str(question) for question in questions[:5]]
+                questions = normalized_questions(result.get("questions", []))
+                if len(questions) >= 3: return questions
                 logger.error("LLM response/schema failure component=planner detail=questions must contain at least three items")
                 repaired = repair_json_with_retry(self.llm, result, "questions: an array containing at least three concise strings", "planner")
-                questions = repaired.get("questions", [])
-                if isinstance(questions, list) and len(questions) >= 3:
-                    return [str(question) for question in questions[:5]]
+                questions = normalized_questions(repaired.get("questions", []))
+                if len(questions) >= 3:
+                    return questions
                 logger.error("Planner repair returned invalid questions; using fallback")
             except LLMAuthError as exc:
                 logger.warning("Planner falling back after LLM authentication failure detail=%s", str(exc)[:240])

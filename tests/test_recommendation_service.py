@@ -11,7 +11,7 @@ from app.services.recommendation_service import RecommendationService
 from tests.test_projects import token_for
 
 
-async def test_recommendations_fall_back_without_artifacts(
+async def test_recommendations_are_empty_when_github_source_is_unavailable(
     client: AsyncClient, tmp_path: Path, monkeypatch
 ) -> None:
     monkeypatch.setenv("RECOMMENDATION_ARTIFACT_DIR", str(tmp_path / "missing"))
@@ -25,16 +25,13 @@ async def test_recommendations_fall_back_without_artifacts(
         headers={"Authorization": f"Bearer {tokens['access_token']}"},
     )
     assert response.status_code == 200
-    body = response.json()
-    assert len(body) == 5
-    assert len({item["id"] for item in body}) == 5
-    assert {item["source"] for item in body} == {"rule_fallback"}
+    assert response.json() == []
 
 
 async def test_recommendation_artifacts_load(
     client: AsyncClient, tmp_path: Path, monkeypatch
 ) -> None:
-    monkeypatch.setattr(ProblemSourceService, "fetch", _empty_sources)
+    monkeypatch.setattr(ProblemSourceService, "fetch", _github_sources)
     tokens = await token_for(client, "recommend-model@example.com")
     user = await client.get(
         "/users/me", headers={"Authorization": f"Bearer {tokens['access_token']}"}
@@ -61,14 +58,14 @@ async def test_external_problem_is_ranked_and_linked(
     )
     candidate = ProblemCandidate(
         problem=SyntheticProblem(
-            id="codeforces-1-A",
+            id="github-leetcode-1",
             title="External Graph Problem",
             topic_tags=("graphs",),
             difficulty=3,
             language="python",
         ),
-        provider="Codeforces",
-        url="https://codeforces.com/problemset/problem/1/A",
+        provider="GitHub · Garvit244/Leetcode",
+        url="https://github.com/Garvit244/Leetcode/blob/master/1-100q/TwoSum.py",
     )
 
     async def fake_fetch(self) -> list[ProblemCandidate]:
@@ -87,7 +84,7 @@ async def test_external_problem_is_ranked_and_linked(
 
     assert len(recommendations) == 1
     assert recommendations[0].source == "bi_encoder"
-    assert recommendations[0].provider == "Codeforces"
+    assert recommendations[0].provider == "GitHub · Garvit244/Leetcode"
     assert recommendations[0].url == candidate.url
 
 
@@ -118,3 +115,102 @@ def test_twenty_stub_learners_produce_personalized_rankings(tmp_path: Path) -> N
 
 async def _empty_sources(self) -> list[ProblemCandidate]:
     return []
+
+
+async def _github_sources(self) -> list[ProblemCandidate]:
+    return [
+        ProblemCandidate(
+            problem=SyntheticProblem(
+                id=f"github-leetcode-{number}",
+                title=f"GitHub problem {number}",
+                topic_tags=("arrays",),
+                difficulty=number,
+                language="python",
+            ),
+            provider="GitHub · Garvit244/Leetcode",
+            url=f"https://github.com/Garvit244/Leetcode/blob/master/{number}.py",
+        )
+        for number in range(1, 5)
+    ]
+
+
+class _FakeGitHubResponse:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def raise_for_status(self) -> None:
+        return None
+
+class _FakeGitHubClient:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args) -> None:
+        return None
+
+    async def get(self, url: str, *args, **kwargs) -> _FakeGitHubResponse:
+        if url.endswith("README.md"):
+            return _FakeGitHubResponse(
+                "| 1 | [Two Sum](https://example.com/two-sum) | "
+                "[Python](1-100q/TwoSum.py) | Easy |"
+            )
+        return _FakeGitHubResponse(
+            "'''Find two numbers that add up to a target.'''\n\n"
+            "class Solution:\n"
+            "    def twoSum(self, nums, target):\n"
+            "        return [0, 1]\n"
+        )
+
+
+async def test_github_leetcode_details_are_normalized(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.problem_sources.httpx.AsyncClient",
+        lambda **kwargs: _FakeGitHubClient(),
+    )
+    ProblemSourceService._detail_cache.clear()
+    ProblemSourceService._github_index.clear()
+
+    detail = await ProblemSourceService().fetch_details("github-leetcode-1")
+
+    assert detail["id"] == "github-leetcode-1"
+    assert detail["title"] == "Two Sum"
+    assert detail["provider"] == "GitHub · Garvit244/Leetcode"
+    assert detail["content"] == "Find two numbers that add up to a target."
+    assert detail["code_snippets"] == [
+        {
+            "lang": "Python",
+            "lang_slug": "python",
+            "code": "class Solution:\n    def twoSum(self, nums, target):\n        pass",
+        }
+    ]
+
+
+async def test_problem_details_endpoint_accepts_github_source(
+    client: AsyncClient, monkeypatch
+) -> None:
+    tokens = await token_for(client, "recommend-details@example.com")
+
+    async def fake_fetch_details(self, problem_id: str) -> dict[str, object]:
+        assert problem_id == "github-leetcode-1"
+        return {
+            "id": "github-leetcode-1",
+            "title": "Two Sum",
+            "title_slug": "github-leetcode-1",
+            "content": "Find two numbers that add up to a target.",
+            "topic_tags": ["arrays"],
+            "difficulty": "Easy",
+            "language": "python",
+            "code_snippets": [],
+            "provider": "GitHub · Garvit244/Leetcode",
+            "url": "https://github.com/Garvit244/Leetcode/blob/master/1-100q/TwoSum.py",
+        }
+
+    monkeypatch.setattr(ProblemSourceService, "fetch_details", fake_fetch_details)
+    response = await client.get(
+        "/problems/details/github-leetcode-1",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["provider"] == "GitHub · Garvit244/Leetcode"
+    assert response.json()["title"] == "Two Sum"

@@ -10,7 +10,6 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ml.data.synthetic_problems import synthetic_problem_catalog
 from app.ml.features import effective_skill, problem_feature_vector, user_feature_vector
 from app.ml.models.bi_encoder import BiEncoder
 from app.schemas.problems import ProblemRecommendation
@@ -59,10 +58,7 @@ class RecommendationService:
         profile = {**asdict(context), "language": "python"}
         candidates = await ProblemSourceService().fetch()
         if not candidates:
-            candidates = [
-                ProblemCandidate(problem, "Synthetic catalog", "")
-                for problem in synthetic_problem_catalog()
-            ]
+            return []
         if self._load_artifacts():
             assert self._model is not None
             user_embedding = self._model.encode_user(user_feature_vector(profile))
