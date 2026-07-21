@@ -48,6 +48,7 @@ class ExecutionService:
         data = response.json()
         run = data.get("run", {})
         output = run.get("output", "")
+        status = "completed" if run.get("code") == 0 else "failed"
         execution = ExecutionRun(
             session_id=payload.session_id,
             code_snapshot=payload.code,
@@ -57,10 +58,22 @@ class ExecutionService:
             stdout=run.get("stdout", output),
             stderr=run.get("stderr", ""),
             exit_code=run.get("code"),
-            status="completed" if run.get("code") == 0 else "failed",
+            status=status,
             static_analysis_result=analysis.model_dump(),
         )
         self.session.add(execution)
         await self.session.commit()
         await self.session.refresh(execution)
+        if status == "completed":
+            from interview_engine.app.main import get_analytics_event_publisher
+
+            get_analytics_event_publisher().publish(
+                event_type="PROBLEM_SOLVED",
+                source="execution",
+                user_id=str(user_id),
+                metadata={
+                    "language": payload.language,
+                    "session_id": str(payload.session_id) if payload.session_id else None,
+                },
+            )
         return execution, run.get("wall_time"), analysis
