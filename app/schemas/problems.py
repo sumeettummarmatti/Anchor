@@ -11,3 +11,5 @@ class ProblemRecommendation(BaseModel):
     language: str
     score: float
     source: str
+    provider: str = "Synthetic catalog"
+    url: str | None = None

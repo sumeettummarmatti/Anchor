@@ -10,11 +10,12 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ml.data.synthetic_problems import SyntheticProblem, synthetic_problem_catalog
-from app.ml.features import effective_skill, user_feature_vector
+from app.ml.data.synthetic_problems import synthetic_problem_catalog
+from app.ml.features import effective_skill, problem_feature_vector, user_feature_vector
 from app.ml.models.bi_encoder import BiEncoder
 from app.schemas.problems import ProblemRecommendation
 from app.services.personalization_service import PersonalizationService
+from app.services.problem_sources import ProblemCandidate, ProblemSourceService
 
 logger = logging.getLogger(__name__)
 
@@ -56,33 +57,61 @@ class RecommendationService:
     async def get_recommendations(self, user_id: UUID, k: int = 5) -> list[ProblemRecommendation]:
         context = await PersonalizationService(self.session).get_context(user_id)
         profile = {**asdict(context), "language": "python"}
-        catalog = synthetic_problem_catalog()
+        candidates = await ProblemSourceService().fetch()
+        if not candidates:
+            candidates = [
+                ProblemCandidate(problem, "Synthetic catalog", "")
+                for problem in synthetic_problem_catalog()
+            ]
         if self._load_artifacts():
             assert self._model is not None
-            assert self._problem_embeddings is not None
             user_embedding = self._model.encode_user(user_feature_vector(profile))
-            ranked = sorted(
+            scored = [
                 (
-                    (
-                        self._cosine(user_embedding, self._problem_embeddings.get(problem.id, [])),
-                        problem,
-                    )
-                    for problem in catalog
-                ),
-                key=lambda item: item[0],
-            )
+                    self._cosine(
+                        user_embedding,
+                        self._model.encode_problem(problem_feature_vector(candidate.problem)),
+                    ),
+                    candidate,
+                )
+                for candidate in candidates
+            ]
+            ranked = sorted(scored, key=lambda item: item[0], reverse=True)
             source = "bi_encoder"
         else:
             skill = effective_skill(profile)
-            ranked = sorted(
-                ((-abs(problem.difficulty - skill), problem) for problem in catalog),
-                key=lambda item: item[0],
-            )
+            scored = [
+                (-abs(candidate.problem.difficulty - skill), candidate)
+                for candidate in candidates
+            ]
+            ranked = sorted(scored, key=lambda item: item[0], reverse=True)
             source = "rule_fallback"
+        selected = self._select_diverse(ranked, max(1, min(k, len(ranked))))
         return [
-            self._response(problem, score, source)
-            for score, problem in reversed(ranked[-max(1, min(k, len(catalog))) :])
+            self._response(candidate, score, source) for score, candidate in selected
         ]
+
+    @staticmethod
+    def _select_diverse(
+        ranked: list[tuple[float, ProblemCandidate]], k: int
+    ) -> list[tuple[float, ProblemCandidate]]:
+        """Keep the strongest result from each provider before filling remaining slots."""
+        selected: list[tuple[float, ProblemCandidate]] = []
+        providers: set[str] = set()
+        for score, candidate in ranked:
+            if candidate.provider in providers:
+                continue
+            selected.append((score, candidate))
+            providers.add(candidate.provider)
+            if len(selected) == k:
+                return selected
+        selected_ids = {candidate.problem.id for _, candidate in selected}
+        selected.extend(
+            (score, candidate)
+            for score, candidate in ranked
+            if candidate.problem.id not in selected_ids
+        )
+        return selected[:k]
 
     @staticmethod
     def _cosine(left: list[float], right: list[float]) -> float:
@@ -91,7 +120,10 @@ class RecommendationService:
         return sum(a * b for a, b in zip(left, right, strict=True))
 
     @staticmethod
-    def _response(problem: SyntheticProblem, score: float, source: str) -> ProblemRecommendation:
+    def _response(
+        candidate: ProblemCandidate, score: float, source: str
+    ) -> ProblemRecommendation:
+        problem = candidate.problem
         return ProblemRecommendation(
             id=problem.id,
             title=problem.title,
@@ -100,4 +132,6 @@ class RecommendationService:
             language=problem.language,
             score=round(float(score), 6),
             source=source,
+            provider=candidate.provider,
+            url=candidate.url or None,
         )

@@ -39,6 +39,8 @@
       .recommendation-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
       .recommendation-card { min-width: 0; padding: 14px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--bg-darker); }
       .recommendation-card h3 { margin: 12px 0 8px; font-size: .92rem; overflow-wrap: anywhere; }
+      .recommendation-link { color: var(--text-heading); text-decoration: none; }
+      .recommendation-link:hover { color: var(--accent-secondary); text-decoration: underline; }
       .recommendation-card .pill { margin: 0 4px 4px 0; }
       .recommendation-tags { display: flex; flex-wrap: wrap; gap: 4px; }
       .recommendation-tags .pill { margin: 0; background: rgba(45, 212, 191, .1); color: var(--text-body); font-weight: 600; }
@@ -429,7 +431,8 @@ print(greet("learner"))</textarea>
             : 'n/a';
           return `<article class="recommendation-card">
             <div><span class="pill">Difficulty ${escapeHtml(recommendation.difficulty)}/5</span><span class="pill">${escapeHtml(source)}</span></div>
-            <h3>${escapeHtml(recommendation.title)}</h3>
+            <h3>${recommendation.url ? `<a class="recommendation-link" href="${escapeHtml(recommendation.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(recommendation.title)}</a>` : escapeHtml(recommendation.title)}</h3>
+            <p class="hint">${escapeHtml(recommendation.provider || 'Synthetic catalog')}</p>
             <div class="recommendation-tags">${tags || '<span class="hint">General practice</span>'}</div>
             <p class="recommendation-score">Match score: ${escapeHtml(score)}</p>
           </article>`;
