@@ -423,6 +423,10 @@ print(greet("learner"))</textarea>
         }
       };
       async function requestProgressiveHint() {
+        if (!$('code').value.trim()) {
+          $('hint-output').textContent = 'Type your code first to get a hint.';
+          return null;
+        }
         const sessionId = await ensureSession();
         const response = await request('/mentor/hint', { method: 'POST', headers: llmAuthHeaders(), body: JSON.stringify({ ...codePayload(), session_id: sessionId, request: 'Give me the next useful hint.' }) });
         $('hint-level').textContent = `Completed level: ${response.level} · next: ${Math.min(response.level + 1, 5)}`;
